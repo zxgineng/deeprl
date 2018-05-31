@@ -1,0 +1,19 @@
+data:
+  environment_name: 'CartPole-v0'
+
+model:
+  fc1_unit: 10
+
+train:
+  batch_size: 32
+  initial_epsilon: 1
+  epsilon_decrease: 0.001
+  reward_decay: 0.9
+  replay_size: 1000
+  replace_target_n_iter: 300
+  learning_rate: 0.01
+  model_dir: 'logs/DQN'
+#  save_checkpoints_steps:
+#  check_hook_n_iter:
+
+
