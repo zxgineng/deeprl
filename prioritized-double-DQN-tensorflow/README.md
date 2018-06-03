@@ -1,6 +1,6 @@
 # double DQN
 
-TensorFlow implementation of [Deep Reinforcement Learning with Double Q-learning](hhttps://arxiv.org/pdf/1509.06461.pdf). (2015. 9)
+TensorFlow implementation of [Deep Reinforcement Learning with Double Q-learning](https://arxiv.org/pdf/1509.06461.pdf). (2015. 9)
 
 ![images](images/paper1.png)
 ![images](images/paper2.png)

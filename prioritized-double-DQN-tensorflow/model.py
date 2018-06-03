@@ -53,6 +53,7 @@ class Model:
         y = tf.placeholder(tf.float32, [None], 'q_target')
         action = tf.placeholder(tf.float32, [None, Config.data.num_action], 'action')
         q_a_eval = tf.reduce_sum(q_eval * action, -1)
+
         self.loss = tf.reduce_mean(tf.squared_difference(y, q_a_eval))
 
     def _build_train_op(self):

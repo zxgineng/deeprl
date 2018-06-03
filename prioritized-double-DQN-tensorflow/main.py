@@ -46,7 +46,7 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    tf.logging.set_verbosity(tf.logging.INFO)
+    # tf.logging.set_verbosity(tf.logging.INFO)
 
     Config(args.config)
     print(Config)
