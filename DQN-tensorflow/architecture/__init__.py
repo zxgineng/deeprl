@@ -5,14 +5,13 @@ from utils import Config
 
 
 class Graph:
-    def __init__(self,name):
+    def __init__(self, name):
         self.name = name
 
-    def build(self, state,num_action):
+    def build(self, inputs):
         with tf.variable_scope(self.name):
             with tf.variable_scope('fc1'):
-                net = slim.fully_connected(state,Config.model.fc1_unit)
+                net = slim.fully_connected(inputs, 20)
             with tf.variable_scope('fc2'):
-                outputs = slim.fully_connected(net,num_action,activation_fn=None)
-            return outputs
-
+                logits = slim.fully_connected(net, Config.data.num_action, activation_fn=None)
+                return logits

@@ -1,45 +1,42 @@
-import gym
 import argparse
 import tensorflow as tf
 
-from agent import Agent
+from model import Model
 from utils import Config
 
 
+def run(mode, run_config, params):
+    model = Model()
+    estimator = tf.estimator.Estimator(
+        model_fn=model.model_fn,
+        model_dir=Config.train.model_dir,
+        params=params,
+        config=run_config)
+
+    if mode == 'train':
+        def input():
+            inputs = tf.placeholder(tf.float32,
+                                    [None, Config.data.state_dim],'current_state')
+
+            return (inputs, None)
+
+        estimator.train(input_fn=input,max_steps=Config.train.max_steps)
+    exit()
+
+
 def main(mode):
-    env = gym.make(Config.data.environment_name)
-    env = env.unwrapped
-    num_action = env.action_space.n
-    state_dim = env.observation_space.shape[0]
-    agent = Agent(num_action, state_dim)
+    params = tf.contrib.training.HParams(**Config.train.to_dict())
 
-    for episode in range(100):
-        observation = env.reset()
-        ep_r = 0
-        while True:
-            env.render()
-            action = agent.choose_action(observation)
-            next_observation, reward, done, info = env.step(action)
+    config = tf.ConfigProto()
+    config.gpu_options.allow_growth = True
 
-            # the smaller theta and closer to center the better
-            x, x_dot, theta, theta_dot = next_observation
-            r1 = (env.x_threshold - abs(x)) / env.x_threshold - 0.8
-            r2 = (env.theta_threshold_radians - abs(theta)) / env.theta_threshold_radians - 0.5
-            reward = r1 + r2
+    run_config = tf.estimator.RunConfig(
+        model_dir=Config.train.model_dir,
+        session_config=config,
+        save_checkpoints_steps=Config.train.save_checkpoints_steps,
+        log_step_count_steps=None)
 
-            agent.store_trainsition(observation,action,reward,next_observation)
-            ep_r += reward
-            if len(agent.replay_memory)>=Config.train.replay_size:
-                agent.train()
-
-            if done:
-                print('episode: ', episode,
-                      'ep_r: ', round(ep_r, 2),
-                      ' epsilon: ', round(agent.epsilon, 2))
-                break
-
-
-
+    run(mode, run_config, params)
 
 
 if __name__ == '__main__':
@@ -50,7 +47,7 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    tf.logging.set_verbosity(tf.logging.INFO)
+    # tf.logging.set_verbosity(tf.logging.INFO)
 
     Config(args.config)
     print(Config)

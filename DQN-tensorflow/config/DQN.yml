@@ -1,19 +1,20 @@
 data:
-  environment_name: 'CartPole-v0'
-
-model:
-  fc1_unit: 10
+  base_path: 'data/'
+  save_state_file: 'state.pkl'
+  num_action: 3
+  state_dim: 2
 
 train:
   batch_size: 32
-  initial_epsilon: 1
-  epsilon_decrease: 0.001
+
+  initial_epsilon: 0.1
+
   reward_decay: 0.9
-  replay_size: 1000
-  replace_target_n_iter: 300
-  learning_rate: 0.01
+  observe_n_iter: 1500
+  memory_size: 3000
+  replace_target_n_iter: 200
+
+  learning_rate: 0.005
+  save_checkpoints_steps: 5000
   model_dir: 'logs/DQN'
-#  save_checkpoints_steps:
-#  check_hook_n_iter:
-
-
+  max_steps: 20000

@@ -1,5 +1,7 @@
 import yaml
 import json
+import os
+import pickle
 
 
 class ConfigMeta(type):
@@ -100,3 +102,14 @@ class SubConfig:
 
     def __repr__(self):
         return json.dumps(self.__dict__["__dict__"], indent=4)
+
+def save_training_state(**kwargs):
+    file = os.path.join(Config.data.base_path, Config.data.save_state_file)
+    with open(file, 'wb') as f:
+        pickle.dump(kwargs,f)
+
+def load_training_state():
+    file = os.path.join(Config.data.base_path, Config.data.save_state_file)
+    with open(file, 'rb') as f:
+        training_state = pickle.load(f)
+    return training_state

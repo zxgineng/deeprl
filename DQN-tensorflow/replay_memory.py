@@ -1,18 +1,24 @@
-import numpy as np
+from collections import deque
+import random
 
-class ExperienceReplay():
-    def __init__(self,maxlen):
+
+class ExperienceReplay:
+    def __init__(self, maxlen):
         self.maxlen = maxlen
-        self.memory = np.zeros([maxlen,10])
-        self.counter = 0
+        self.memory = deque(maxlen=maxlen)
 
-    def add(self,current):
-        self.memory[self.counter%self.maxlen] = np.hstack(current)
-        self.counter+=1
+    def add(self, *args):
+        self.memory.append(args)
 
-    def get_batch(self,batch_size):
-        sample_index = np.random.choice(self.maxlen,batch_size)
-        return self.memory[sample_index,:]
+    def get_batch(self, batch_size):
+        sample = random.sample(self.memory, batch_size)
+        return sample
 
-    def __len__(self):
-        return min(self.counter,self.maxlen)
+    def get_length(self):
+        return len(self.memory)
+
+    def load_memory(self, memory):
+        self.memory = memory
+
+    def get_memory(self):
+        return self.memory
