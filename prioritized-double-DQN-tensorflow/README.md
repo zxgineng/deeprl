@@ -1,4 +1,4 @@
-# double DQN
+# Prioritize Double DQN
 
 TensorFlow implementation of [Prioritized Experience Replay](https://arxiv.org/pdf/1511.05952.pdf). (2015. 11)
 
