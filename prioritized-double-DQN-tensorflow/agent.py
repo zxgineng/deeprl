@@ -1,14 +1,14 @@
 import numpy as np
 import tensorflow as tf
 
-from replay_memory import ExperienceReplay
+from replay_memory import PriorizedExperienceReplay
 from utils import Config
 
 
 class Agent:
 
     def __init__(self):
-        self.replay_memory = ExperienceReplay(Config.train.memory_size)
+        self.replay_memory = PriorizedExperienceReplay(Config.train.memory_size)
 
     def choose_action(self, observation, sess, epsilon, one_hot=False):
 
@@ -27,7 +27,7 @@ class Agent:
         return action
 
     def learn(self, sess):
-        batch = self.replay_memory.get_batch(Config.train.batch_size)
+        self.leaf_idx, batch, ISWeights = self.replay_memory.get_batch(Config.train.batch_size)
 
         state, action, reward, next_state = [], [], [], []
         for d in batch:
@@ -45,7 +45,7 @@ class Agent:
         q_next, q_eval_next = sess.run(['q_next:0', 'q_eval:0'],
                                        feed_dict={'next_state:0': next_state, 'current_state:0': next_state})
 
-        for i in range(0, len(batch)):
+        for i in range(len(batch)):
             terminal = batch[i][4]
             # if terminal, only equals reward
             if terminal:
@@ -54,5 +54,5 @@ class Agent:
                 a_next_index = np.argmax(q_eval_next, -1)
                 y.append(reward[i] + Config.train.reward_decay * q_next[i, a_next_index[i]])
 
-        return tf.train.SessionRunArgs('global_step:0',
-                                       feed_dict={'q_target:0': y, 'current_state:0': state, 'action:0': action})
+        return tf.train.SessionRunArgs(['global_step:0','td_errors:0'],
+                                       feed_dict={'q_target:0': y, 'current_state:0': state, 'action:0': action, 'ISWeights:0':ISWeights})

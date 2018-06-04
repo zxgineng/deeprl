@@ -50,11 +50,13 @@ class Model:
         q_next = graph.build(next_state)
         tf.identity(q_next, 'q_next')
 
-        y = tf.placeholder(tf.float32, [None], 'q_target')
-        action = tf.placeholder(tf.float32, [None, Config.data.num_action], 'action')
+        y = tf.placeholder(tf.float32, [Config.train.batch_size], 'q_target')
+        action = tf.placeholder(tf.float32, [Config.train.batch_size, Config.data.num_action], 'action')
         q_a_eval = tf.reduce_sum(q_eval * action, -1)
 
-        self.loss = tf.reduce_mean(tf.squared_difference(y, q_a_eval))
+        ISWeights = tf.placeholder(tf.float32, [Config.train.batch_size], name='ISWeights')
+        tf.abs(y - q_a_eval,'td_errors')
+        self.loss = tf.reduce_mean(ISWeights * tf.squared_difference(y, q_a_eval))
 
     def _build_train_op(self):
         self.global_step = tf.train.get_or_create_global_step()
@@ -94,7 +96,7 @@ class Model:
                         self.agent.replay_memory.load_memory(training_state['replay_memory'])
 
                         print('training state loaded:')
-                        print('replay memory: %d' %(self.agent.replay_memory.get_length()))
+                        print('replay memory: %d' %(self.agent.replay_memory.length))
                 except Exception as e:
                     print(e.args[0])
                     print('load state failed.')
@@ -117,24 +119,33 @@ class Model:
 
                     self.observation = next_observation
 
-                    if self.agent.replay_memory.get_length() >= Config.train.observe_n_iter:
+                    if self.agent.replay_memory.length >= Config.train.observe_n_iter:
                         return self.agent.learn(run_context.session)
                     else:
                         continue
 
             def after_run(self, run_context, run_values):
+                global_step, td_errors = run_values.results
+                self.agent.replay_memory.update_sum_tree(self.agent.leaf_idx,td_errors)
 
-                global_step = run_values.results
-                if global_step % Config.train.replace_target_n_iter == 0:
+                if global_step == 0 or global_step % Config.train.replace_target_n_iter == 0:
                     run_context.session.run(self.replace_target_op)
                     print('target params replaced.')
 
-                if global_step % Config.train.save_checkpoints_steps == 0:
+                if global_step == 0 or global_step % Config.train.save_checkpoints_steps == 0:
                     try:
                         save_training_state(replay_memory=self.agent.replay_memory.get_memory())
                         print('training state saved.')
                     except Exception as e:
                         print(e.args[0])
                         print('save state failed.')
+
+            def end(self,session):
+                try:
+                    save_training_state(replay_memory=self.agent.replay_memory.get_memory())
+                    print('training state saved.')
+                except Exception as e:
+                    print(e.args[0])
+                    print('save state failed.')
 
         self.training_hooks = [AlgoTrainHook(self.env, self.agent, self)]
