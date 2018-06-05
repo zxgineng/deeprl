@@ -7,7 +7,7 @@ class ExperienceReplay:
         self.maxlen = maxlen
         self.memory = deque(maxlen=maxlen)
 
-    def add(self, *args):
+    def add(self, args):
         self.memory.append(args)
 
     def get_batch(self, batch_size):

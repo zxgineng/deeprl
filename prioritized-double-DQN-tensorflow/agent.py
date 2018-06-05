@@ -9,13 +9,14 @@ class Agent:
 
     def __init__(self):
         self.replay_memory = PriorizedExperienceReplay(Config.train.memory_size)
+        self.sess = None
 
-    def choose_action(self, observation, sess, epsilon, one_hot=False):
+    def choose_action(self, observation, epsilon, one_hot=False):
 
         observation = np.expand_dims(observation, 0)
 
         if np.random.uniform() >= epsilon:
-            actions_value = sess.run('q_eval:0', feed_dict={'current_state:0': observation})
+            actions_value = self.sess.run('q_eval:0', feed_dict={'current_state:0': observation})
             action = np.argmax(actions_value)
         else:
             action = np.random.randint(0, Config.data.num_action)
@@ -26,7 +27,10 @@ class Agent:
             action[action_index] = 1
         return action
 
-    def learn(self, sess):
+    def store_transition(self,*args):
+        self.replay_memory.add(args)
+
+    def learn(self):
         self.leaf_idx, batch, ISWeights = self.replay_memory.get_batch(Config.train.batch_size)
 
         state, action, reward, next_state = [], [], [], []
@@ -42,7 +46,7 @@ class Agent:
             next_state.append(d[3])
 
         y = []
-        q_next, q_eval_next = sess.run(['q_next:0', 'q_eval:0'],
+        q_next, q_eval_next = self.sess.run(['q_next:0', 'q_eval:0'],
                                        feed_dict={'next_state:0': next_state, 'current_state:0': next_state})
 
         for i in range(len(batch)):

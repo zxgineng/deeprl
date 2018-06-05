@@ -69,10 +69,9 @@ class Model:
 
         class AlgoTrainHook(tf.train.SessionRunHook):
 
-            def __init__(self, env, agent, model):
+            def __init__(self, env, agent):
                 self.env = env
                 self.agent = agent
-                self.model = model
 
                 self.done = True
                 self._build_replace_target_op()
@@ -87,6 +86,7 @@ class Model:
                                           zip(train_params, target_params)]
 
             def after_create_session(self, session, coord):
+                self.agent.sess = session
                 self.epsilon = Config.train.initial_epsilon
 
                 file = os.path.join(Config.data.base_path, Config.data.save_state_file)
@@ -109,18 +109,17 @@ class Model:
 
                     self.env.render()
 
-                    action = self.agent.choose_action(self.observation, run_context.session,
-                                                      self.epsilon)
+                    action = self.agent.choose_action(self.observation,self.epsilon)
                     f_action = (action - (Config.data.num_action - 1) / 2) / (
                                 (Config.data.num_action - 1) / 4)  # convert to [-2 ~ 2] float actions
 
                     next_observation, reward, self.done, info = self.env.step([f_action])
-                    self.agent.replay_memory.add(self.observation, action, reward, next_observation, self.done)
+                    self.agent.store_transition(self.observation, action, reward, next_observation, self.done)
 
                     self.observation = next_observation
 
                     if self.agent.replay_memory.length >= Config.train.observe_n_iter:
-                        return self.agent.learn(run_context.session)
+                        return self.agent.learn()
                     else:
                         continue
 
@@ -148,4 +147,4 @@ class Model:
                     print(e.args[0])
                     print('save state failed.')
 
-        self.training_hooks = [AlgoTrainHook(self.env, self.agent, self)]
+        self.training_hooks = [AlgoTrainHook(self.env, self.agent)]

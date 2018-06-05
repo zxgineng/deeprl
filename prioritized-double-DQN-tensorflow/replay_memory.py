@@ -10,7 +10,7 @@ class PriorizedExperienceReplay:
         self.beta_increment_per_sampling = 0.001
         self.abs_err_upper = 1.  # clipped td error
 
-    def add(self, *args):
+    def add(self, args):
         max_p = np.max(self.memory.tree[-self.memory.capacity:])    # max adj_pri of leaves
         if max_p == 0:
             max_p = self.abs_err_upper

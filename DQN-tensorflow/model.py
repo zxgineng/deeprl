@@ -85,6 +85,7 @@ class Model:
                                           zip(train_params, target_params)]
 
             def after_create_session(self, session, coord):
+                self.agent.sess = session
                 self.epsilon = Config.train.initial_epsilon
 
                 file = os.path.join(Config.data.base_path, Config.data.save_state_file)
@@ -110,14 +111,15 @@ class Model:
 
                     self.env.render()
 
-                    action = self.agent.choose_action(self.observation, run_context.session,
-                                                      self.epsilon)
+                    action = self.agent.choose_action(self.observation,self.epsilon)
 
                     next_observation, reward, self.done, info = self.env.step(action)
 
                     reward = abs(next_observation[0] - (-0.5))
 
-                    self.agent.replay_memory.add(self.observation, action, reward, next_observation, self.done)
+                    # self.agent.replay_memory.add(self.observation, action, reward, next_observation, self.done)
+                    self.agent.store_transition(self.observation, action, reward, next_observation, self.done)
+
                     self.ep_reward += reward
 
                     self.observation = next_observation
@@ -127,7 +129,7 @@ class Model:
                         print('episode: ', self.episode, '  ep_reward: ', round(self.ep_reward, 2))
 
                     if self.agent.replay_memory.get_length() >= Config.train.observe_n_iter:
-                        return self.agent.learn(run_context.session)
+                        return self.agent.learn()
                     else:
                         continue
 
@@ -146,6 +148,15 @@ class Model:
                     except Exception as e:
                         print(e.args[0])
                         print('save state failed.')
+
+            def end(self,session):
+                try:
+                    save_training_state(episode=self.episode,
+                                        replay_memory=self.agent.replay_memory.get_memory())
+                    print('training state saved.')
+                except Exception as e:
+                    print(e.args[0])
+                    print('save state failed.')
 
         self.training_hooks = [AlgoTrainHook(self.env, self.agent, self)]
 
