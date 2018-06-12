@@ -9,6 +9,7 @@ TensorFlow implementation of [Continuous control with deep reinforcement learnin
 - Python 3
 - TensorFlow 1.5
 - gym
+- MuJoCo (30-day trial)
 
 
 ## Project Structure
@@ -32,25 +33,28 @@ DDPG.yml
 data:
   base_path: 'data/'
   save_state_file: 'state.pkl'
-  action_dim: 1
-  state_dim: 3
 
 train:
-  batch_size: 32
+  batch_size: 64
 
-  reward_decay: 0.9
-  observe_n_iter: 10000
-  memory_size: 10000
+  noise_theta: 0.15
+  noise_sigma: 0.2
+  noise_mu: 0
 
-  TAU: 0.01
+  reward_decay: 0.99
+  observe_n_iter: 100000
+  memory_size: 1000000
 
-  actor_learning_rate: 0.001
+  TAU: 0.001
+
+  critic_l2_loss_weight: 0.02
+
+  actor_learning_rate: 0.0001
   critic_learning_rate: 0.001
 
-  save_checkpoints_steps: 5000
+  save_checkpoints_steps: 50000
   model_dir: 'logs/ddpg'
-  max_steps: 30000
-
+  max_steps: 2500000
 ```
 
 

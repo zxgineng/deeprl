@@ -1,6 +1,5 @@
 import numpy as np
 import tensorflow as tf
-import gym
 
 from train_hooks import AlgoTrainHook
 from architecture import ActorGraph, CriticGraph
@@ -9,19 +8,23 @@ from utils import Config
 
 
 class Agent:
-    def __init__(self):
+    def __init__(self, env):
         self.replay_memory = ExperienceReplay(Config.train.memory_size)
+        self.env = env
         self.sess = None
+        self._config_initialize()
+
+    def _config_initialize(self):
+        """initialize env config"""
+        Config.data.action_dim = self.env.action_space.shape[0]
+        Config.data.action_bound = self.env.action_space.high[0]
+        Config.data.state_dim = self.env.observation_space.shape[0]
 
     def model_fn(self, mode, features, labels, params):
         self.mode = mode
         self.states = features
         self.loss, self.train_op, self.predictions, self.training_hooks = None, None, None, None
         self.build_graph()
-
-        # train mode: required loss and train_op
-        # eval mode: required loss
-        # predict mode: required predictions
 
         return tf.estimator.EstimatorSpec(
             mode=mode,
@@ -39,17 +42,20 @@ class Agent:
             self._build_train_op()
 
     def _build_loss(self, actions):
-        self.noise = 3
+        self.ou_noise = OUNoise(Config.data.action_dim, Config.train.noise_theta, Config.train.noise_sigma,
+                                Config.train.noise_mu)
+
         next_state = tf.placeholder(tf.float32, [Config.train.batch_size, Config.data.state_dim], 'next_state')
-        rewards = tf.placeholder(tf.float32, [Config.train.batch_size, 1], 'rewards')
 
         q_eval = CriticGraph('eval').build(self.states, actions)
         next_actions = ActorGraph('target').build(next_state)
         q_next = CriticGraph('target').build(next_state, next_actions)
-        q_target = rewards + Config.train.reward_decay * q_next
+        tf.identity(q_next, 'q_next')
+        q_target = tf.placeholder(tf.float32, [Config.train.batch_size, 1],'q_target')
 
-        self.actor_loss = - tf.reduce_mean(q_eval)
-        self.critic_loss = tf.reduce_mean(tf.square(q_target - q_eval))
+        self.actor_loss = -tf.reduce_mean(q_eval)
+        self.critic_loss = tf.reduce_mean(tf.square(q_target - q_eval)) + tf.losses.get_regularization_loss(
+            'critic/eval')
 
     def _build_train_op(self):
         global_step = tf.train.get_or_create_global_step()
@@ -62,32 +68,61 @@ class Agent:
                                                                                                       'critic/eval'))
         self.train_op = self.actor_train_op
 
-        env = gym.make('Pendulum-v0').unwrapped
-        self.training_hooks = [AlgoTrainHook(env, self)]
+        self.training_hooks = [AlgoTrainHook(self.env, self)]
 
     def choose_action(self, observation):
         """choose action from actor eval net"""
-        observation = np.expand_dims(observation, 0)
-        action = self.sess.run('eval/actions:0', feed_dict={self.states: observation})
-        exploration_noise = np.random.normal(0, self.noise)  # add exploration noise
-        action = np.clip(action + exploration_noise, -2, 2)
-        return action[0]
+        observation = [observation]
+        action = self.sess.run('eval/actions:0', feed_dict={self.states: observation})[0]
+        noise = self.ou_noise.noise()  # add exploration noise
+        action = np.clip(action + noise, -Config.data.action_bound, Config.data.action_bound)
+        return action
 
     def store_transition(self, *args):
         self.replay_memory.add(args)
 
     def learn(self):
-        self.noise = self.noise * 0.9995
         batch = self.replay_memory.get_batch(Config.train.batch_size)
         states, actions, rewards, next_states = [], [], [], []
+
         for d in batch:
             states.append(d[0])
             actions.append(d[1])
-            rewards.append([d[2]])  # rewards shape [N,1]
+            rewards.append(d[2])
             next_states.append(d[3])
 
-        self.sess.run(self.critic_train_op, {'current_state:0': states, 'eval/actions:0': actions, 'rewards:0': rewards,
-                                             'next_state:0': next_states})
+        q_next = self.sess.run('q_next:0', {'next_state:0': next_states})
+        q_target = []
+
+        for i in range(len(batch)):
+            done = batch[i][4]
+            if done:
+                q_target.append([rewards[i]])
+            else:
+                q_target.append([rewards[i] + Config.train.reward_decay * q_next[i][0]])
+
+        self.sess.run(self.critic_train_op,
+                      {'current_state:0': states, 'eval/actions:0': actions, 'q_target:0': q_target})
 
         return tf.train.SessionRunArgs('global_step:0',
                                        feed_dict={'current_state:0': states})
+
+
+class OUNoise:
+    """Ornstein–Uhlenbeck process"""
+
+    def __init__(self, action_dim, theta=0.15, sigma=0.2, mu=0):
+        self.action_dim = action_dim
+        self.mu = mu
+        self.theta = theta
+        self.sigma = sigma
+        self.reset()
+
+    def reset(self):
+        self.state = np.ones(self.action_dim) * self.mu
+
+    def noise(self):
+        x = self.state
+        dx = self.theta * (self.mu - x) + self.sigma * np.random.randn(len(x))
+        self.state = x + dx
+        return self.state

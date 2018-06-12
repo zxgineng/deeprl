@@ -1,12 +1,14 @@
 import argparse
 import tensorflow as tf
+import gym
 
 from agent import Agent
 from utils import Config
 
 
 def run(mode, run_config, params):
-    agent = Agent()
+    env = gym.make('Hopper-v2').unwrapped
+    agent = Agent(env)
     estimator = tf.estimator.Estimator(
         model_fn=agent.model_fn,
         model_dir=Config.train.model_dir,
@@ -21,7 +23,7 @@ def run(mode, run_config, params):
             return inputs, None
 
         estimator.train(input_fn=input, max_steps=Config.train.max_steps)
-    exit()
+    env.close()
 
 
 def main(mode):

@@ -1,4 +1,5 @@
 import tensorflow as tf
+from collections import deque
 
 from utils import *
 
@@ -9,11 +10,28 @@ class AlgoTrainHook(tf.train.SessionRunHook):
         self.agent = agent
 
         self.done = True
+        self.episode = 0
+        self.ep_reward_queue = deque([], 100)
+        self.ave_reward_list = []
 
         self._build_replace_target_op()
 
         if not os.path.exists(Config.data.base_path):
             os.makedirs(Config.data.base_path)
+
+    def _load_training_state(self):
+        training_state = load_training_state()
+        if training_state:
+            self.agent.replay_memory.load_memory(training_state['memory'])
+            self.episode = training_state['episode']
+            self.ep_reward_queue = training_state['reward_queue']
+            self.ave_reward_list = training_state['ave_reward_list']
+            print('episode: ', self.episode, '    training state loaded.')
+
+    def _save_training_state(self):
+        save_training_state(memory=self.agent.replay_memory.get_memory(), episode=self.episode,
+                            reward_queue=self.ep_reward_queue, ave_reward_list=self.ave_reward_list)
+        print('episode: ', self.episode, '    training state saved.')
 
     def _build_replace_target_op(self):
         a_params = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='actor/eval')
@@ -42,31 +60,36 @@ class AlgoTrainHook(tf.train.SessionRunHook):
 
     def after_create_session(self, session, coord):
         self.agent.sess = session
-
         session.run(self.initial_replace_op)
-        file = os.path.join(Config.data.base_path, Config.data.save_state_file)
-        try:
-            if os.path.isfile(file):
-                training_state = load_training_state()
-                self.agent.replay_memory.load_memory(training_state['memory'])
-                print('training state loaded:')
-                print('replay memory: %d' % (self.agent.replay_memory.length))
-        except Exception as e:
-            print(e.args[0])
-            print('load state failed.')
+        self._load_training_state()
 
     def before_run(self, run_context):
 
         while True:
             if self.done:
                 self.observation = self.env.reset()
+                self.ep_reward = 0
 
+            # self.env.render()
             action = self.agent.choose_action(self.observation)
 
             next_observation, reward, self.done, info = self.env.step(action)
 
-            self.agent.store_transition(self.observation, action, reward, next_observation)
-            self.observation = next_observation
+            self.agent.store_transition(self.observation, action, reward, next_observation, self.done)
+
+            self.ep_reward += reward
+
+            if self.done:
+                self.episode += 1
+                self.ep_reward_queue.append(self.ep_reward)
+                if self.episode % 100 == 0:
+                    ave_ep_reward = round(sum(self.ep_reward_queue) / len(self.ep_reward_queue),2)
+                    self.ave_reward_list.append(ave_ep_reward)
+                    print('*' * 40)
+                    print('episode:', self.episode, ' ave_ep_reward:', ave_ep_reward)
+                    print('*' * 40)
+            else:
+                self.observation = next_observation
 
             if self.agent.replay_memory.length >= Config.train.observe_n_iter:
                 return self.agent.learn()
@@ -76,18 +99,8 @@ class AlgoTrainHook(tf.train.SessionRunHook):
         global_step = run_values.results
         run_context.session.run(self.replace_target_op)
 
-        if global_step == 0 or global_step % Config.train.save_checkpoints_steps == 0:
-            try:
-                save_training_state(memory=self.agent.replay_memory.get_memory())
-                print('training state saved.')
-            except Exception as e:
-                print(e.args[0])
-                print('save state failed.')
+        if global_step == 1 or global_step % Config.train.save_checkpoints_steps == 0:
+            self._save_training_state()
 
     def end(self, session):
-        try:
-            save_training_state(memory=self.agent.replay_memory.get_memory())
-            print('training state saved.')
-        except Exception as e:
-            print(e.args[0])
-            print('save state failed.')
+        self._save_training_state()
