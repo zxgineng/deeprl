@@ -33,6 +33,7 @@ DDPG.yml
 data:
   base_path: 'data/'
   save_state_file: 'state.pkl'
+  env_name: 'Hopper-v2'
 
 train:
   batch_size: 64
@@ -52,7 +53,7 @@ train:
   actor_learning_rate: 0.0001
   critic_learning_rate: 0.001
 
-  save_checkpoints_steps: 50000
+  save_checkpoints_steps: 500000
   model_dir: 'logs/ddpg'
   max_steps: 2500000
 ```
@@ -64,6 +65,19 @@ train:
 Train
 
 ```
-python main.py
+python main.py --mode train
 ```
 
+Evaluate
+
+```
+python main.py --mode eval
+```
+
+## Example
+teach the object to jump
+  
+![images](images/reward.jpg)
+
+
+![images](images/example.gif)

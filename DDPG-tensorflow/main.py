@@ -15,14 +15,16 @@ def run(mode, run_config, params):
         params=params,
         config=run_config)
 
+    def input():
+        inputs = tf.placeholder(tf.float32,
+                                [None, Config.data.state_dim], 'current_state')
+
+        return inputs, None
+
     if mode == 'train':
-        def input():
-            inputs = tf.placeholder(tf.float32,
-                                    [None, Config.data.state_dim], 'current_state')
-
-            return inputs, None
-
         estimator.train(input_fn=input, max_steps=Config.train.max_steps)
+    elif mode == 'eval':
+        estimator.evaluate(input_fn=input)
     env.close()
 
 
@@ -43,7 +45,7 @@ def main(mode):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument('--mode', type=str, default='train', choices=['train'],
+    parser.add_argument('--mode', type=str, default='train', choices=['train','eval'],
                         help='Mode (train)')
     parser.add_argument('--config', type=str, default='config/ddpg.yml', help='config file name')
 

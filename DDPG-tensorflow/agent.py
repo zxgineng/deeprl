@@ -1,7 +1,7 @@
 import numpy as np
 import tensorflow as tf
 
-from train_hooks import AlgoTrainHook
+from hooks import TrainHook, EvalHook
 from architecture import ActorGraph, CriticGraph
 from replay_memory import ExperienceReplay
 from utils import Config
@@ -23,23 +23,26 @@ class Agent:
     def model_fn(self, mode, features, labels, params):
         self.mode = mode
         self.states = features
-        self.loss, self.train_op, self.predictions, self.training_hooks = None, None, None, None
+        self.loss, self.train_op, self.predictions, self.training_hooks, self.evaluation_hooks = None, None, None, None, None
         self.build_graph()
 
         return tf.estimator.EstimatorSpec(
             mode=mode,
-            loss=self.actor_loss,
+            loss=self.loss,
             train_op=self.train_op,
             predictions=self.predictions,
-            training_hooks=self.training_hooks)
+            training_hooks=self.training_hooks, evaluation_hooks=self.evaluation_hooks)
 
     def build_graph(self):
         actions = ActorGraph('eval').build(self.states)
         actions = tf.identity(actions, 'eval/actions')
 
-        if self.mode != tf.estimator.ModeKeys.PREDICT:
+        if self.mode == tf.estimator.ModeKeys.TRAIN:
             self._build_loss(actions)
             self._build_train_op()
+        else:
+            self.loss = tf.constant(1)
+            self.evaluation_hooks = [EvalHook(self.env, self)]
 
     def _build_loss(self, actions):
         self.ou_noise = OUNoise(Config.data.action_dim, Config.train.noise_theta, Config.train.noise_sigma,
@@ -51,11 +54,12 @@ class Agent:
         next_actions = ActorGraph('target').build(next_state)
         q_next = CriticGraph('target').build(next_state, next_actions)
         tf.identity(q_next, 'q_next')
-        q_target = tf.placeholder(tf.float32, [Config.train.batch_size, 1],'q_target')
+        q_target = tf.placeholder(tf.float32, [Config.train.batch_size, 1], 'q_target')
 
         self.actor_loss = -tf.reduce_mean(q_eval)
         self.critic_loss = tf.reduce_mean(tf.square(q_target - q_eval)) + tf.losses.get_regularization_loss(
             'critic/eval')
+        self.loss = self.actor_loss
 
     def _build_train_op(self):
         global_step = tf.train.get_or_create_global_step()
@@ -70,12 +74,13 @@ class Agent:
 
         self.training_hooks = [AlgoTrainHook(self.env, self)]
 
-    def choose_action(self, observation):
+    def choose_action(self, observation, noise=True):
         """choose action from actor eval net"""
         observation = [observation]
         action = self.sess.run('eval/actions:0', feed_dict={self.states: observation})[0]
-        noise = self.ou_noise.noise()  # add exploration noise
-        action = np.clip(action + noise, -Config.data.action_bound, Config.data.action_bound)
+        if noise:
+            noise = self.ou_noise.noise()  # add exploration noise
+            action = np.clip(action + noise, -Config.data.action_bound, Config.data.action_bound)
         return action
 
     def store_transition(self, *args):
