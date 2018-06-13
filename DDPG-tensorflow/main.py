@@ -7,7 +7,7 @@ from utils import Config
 
 
 def run(mode, run_config, params):
-    env = gym.make('Hopper-v2').unwrapped
+    env = gym.make(Config.data.env_name).unwrapped
     agent = Agent(env)
     estimator = tf.estimator.Estimator(
         model_fn=agent.model_fn,

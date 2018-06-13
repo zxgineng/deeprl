@@ -1,6 +1,7 @@
 data:
   base_path: 'data/'
   save_state_file: 'state.pkl'
+  env_name: 'Hopper-v2'
 
 train:
   batch_size: 64
