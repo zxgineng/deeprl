@@ -22,7 +22,7 @@ TensorFlow implementation of [Continuous control with deep reinforcement learnin
     ├── main.py                 # train and evaluate
     ├── utils.py                # config tools 
     ├── replay_memory.py        # restore and sample 
-    └── train_hooks.py          # define algo hook
+    └── hooks.py                # define hooks
     
 
 ## Config
