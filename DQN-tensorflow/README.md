@@ -18,11 +18,11 @@ learning](https://web.stanford.edu/class/psych209/Readings/MnihEtAlHassibis15Nat
     ├── config                  # Config files (.yml)
     ├── architecture            # architecture graphs
         ├── __init__.py             # network
-    ├── agent.py                # agent
+    ├── agent.py                # define agent, model, loss
     ├── main.py                 # train and evaluate
     ├── utils.py                # config tools 
     ├── replay_memory.py        # restore and sample 
-    └── model.py                # define model, loss, algo
+    └── hooks.py                # define hooks
     
 
 ## Config
@@ -31,10 +31,10 @@ DQN.yml
 
 ```yml
 data:
+data:
   base_path: 'data/'
   save_state_file: 'state.pkl'
-  num_action: 3
-  state_dim: 2
+  env_name: 'MountainCar-v0'
 
 train:
   batch_size: 32

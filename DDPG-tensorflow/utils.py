@@ -106,24 +106,30 @@ class SubConfig:
 
 
 def save_training_state(**kwargs):
-    file = os.path.join(Config.data.base_path, Config.data.save_state_file)
+    if 'file' in kwargs:
+        file = kwargs['file']
+    else:
+        file = os.path.join(Config.data.base_path, Config.data.save_state_file)
     try:
         with open(file, 'wb') as f:
             pickle.dump(kwargs, f)
     except Exception as e:
-        print(e.args[0])
+        print(e.args)
         print('save state failed.')
 
 
-def load_training_state():
-    file = os.path.join(Config.data.base_path, Config.data.save_state_file)
+def load_training_state(**kwargs):
+    if 'file' in kwargs:
+        file = kwargs['file']
+    else:
+        file = os.path.join(Config.data.base_path, Config.data.save_state_file)
     if os.path.isfile(file):
         try:
             with open(file, 'rb') as f:
                 training_state = pickle.load(f)
             return training_state
         except Exception as e:
-            print(e.args[0])
+            print(e.args)
             print('load state failed.')
     else:
         return None

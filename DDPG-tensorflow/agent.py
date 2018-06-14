@@ -31,7 +31,8 @@ class Agent:
             loss=self.loss,
             train_op=self.train_op,
             predictions=self.predictions,
-            training_hooks=self.training_hooks, evaluation_hooks=self.evaluation_hooks)
+            training_hooks=self.training_hooks,
+            evaluation_hooks=self.evaluation_hooks)
 
     def build_graph(self):
         actions = ActorGraph('eval').build(self.states)
@@ -72,7 +73,7 @@ class Agent:
                                                                                                       'critic/eval'))
         self.train_op = self.actor_train_op
 
-        self.training_hooks = [AlgoTrainHook(self.env, self)]
+        self.training_hooks = [TrainHook(self)]
 
     def choose_action(self, observation, noise=True):
         """choose action from actor eval net"""

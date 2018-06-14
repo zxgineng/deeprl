@@ -1,14 +1,16 @@
 import argparse
 import tensorflow as tf
+import gym
 
-from model import Model
+from agent import Agent
 from utils import Config
 
 
 def run(mode, run_config, params):
-    model = Model()
+    env = gym.make(Config.data.env_name).unwrapped
+    agent = Agent(env)
     estimator = tf.estimator.Estimator(
-        model_fn=model.model_fn,
+        model_fn=agent.model_fn,
         model_dir=Config.train.model_dir,
         params=params,
         config=run_config)
@@ -21,7 +23,7 @@ def run(mode, run_config, params):
             return (inputs, None)
 
         estimator.train(input_fn=input, max_steps=Config.train.max_steps)
-    exit()
+    env.close()
 
 
 def main(mode):

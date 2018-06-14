@@ -5,8 +5,8 @@ from utils import *
 
 
 class TrainHook(tf.train.SessionRunHook):
-    def __init__(self, env, agent):
-        self.env = env
+    def __init__(self, agent):
+        self.env = agent.env
         self.agent = agent
 
         self.done = True
