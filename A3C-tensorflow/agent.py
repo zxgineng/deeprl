@@ -3,7 +3,7 @@ import tensorflow as tf
 import multiprocessing
 import copy
 
-from architecture import ActorGraph, CriticGraph
+from architecture import Graph
 from utils import Config
 from hooks import TrainingHook
 
@@ -18,7 +18,7 @@ class Model:
         """initialize env config"""
         if 'n' not in vars(self.env.action_space):
             Config.data.action_dim = self.env.action_space.shape[0]
-            Config.data.action_bound = self.env.action_space.high[0]
+            Config.data.action_bound = self.env.action_space.high
             Config.data.action_type = 'continuous'
         else:
             Config.data.action_num = self.env.action_space.n
@@ -49,7 +49,7 @@ class Model:
 
             if self.mode == tf.estimator.ModeKeys.TRAIN:
                 ave_ep_reward = tf.placeholder(tf.float32, name='ave_ep_reward')
-                tf.summary.scalar('ave_ep_reward',ave_ep_reward)
+                tf.summary.scalar('ave_ep_reward', ave_ep_reward)
                 self.loss = ave_ep_reward
                 self.train_op = tf.no_op()
                 self.training_hooks = [TrainingHook(chief, workers)]
@@ -72,14 +72,14 @@ class Agent:
                 self.states = tf.placeholder(tf.float32, [None, Config.data.state_dim])
 
                 if Config.data.action_type == 'discrete':
-                    logits = ActorGraph().build(self.states)
+                    _, logits = Graph().build(self.states)
                     tf.nn.softmax(logits, name='action_prob')
                 else:
-                    mu, sigma = ActorGraph().build(self.states)
+                    _, mu, sigma = Graph().build(self.states)
+                    mu, sigma = Config.data.action_bound * mu, sigma
                     normal_dist = tf.distributions.Normal(mu, sigma)
                     tf.clip_by_value(tf.squeeze(normal_dist.sample(1), axis=[0, 1]), -Config.data.action_bound,
                                      Config.data.action_bound, 'continuous_action')
-                CriticGraph().build(self.states)
 
                 self.actor_params = tf.trainable_variables('chief/actor')
                 self.critic_params = tf.trainable_variables('chief/critic')
@@ -96,14 +96,14 @@ class Agent:
                     self.actions = tf.placeholder(tf.float32, [None, Config.data.action_dim], 'actions')
                 self.v_target = tf.placeholder(tf.float32, [None, 1], 'v_target')
 
-                self.value = CriticGraph().build(self.states)
                 if Config.data.action_type == 'discrete':
-                    logits = ActorGraph().build(self.states)
+                    self.value, logits = Graph().build(self.states)
                     action_prob = tf.nn.softmax(logits, name='action_prob')
-                    self._build_dicrete_loss(action_prob)
+                    self._build_discrete_loss(action_prob)
                 else:
-                    mu, sigma = ActorGraph().build(self.states)
-                    mu, sigma = Config.data.action_bound * mu, sigma + 1e-4
+                    self.value, mu, sigma = Graph().build(self.states)
+                    mu, sigma = Config.data.action_bound * mu, sigma
+
                     normal_dist = tf.distributions.Normal(mu, sigma)
                     tf.clip_by_value(tf.squeeze(normal_dist.sample(1), axis=[0, 1]), -Config.data.action_bound,
                                      Config.data.action_bound, 'continuous_action')
@@ -111,7 +111,7 @@ class Agent:
 
                 self._build_update_op()
 
-    def _build_dicrete_loss(self, action_prob):
+    def _build_discrete_loss(self, action_prob):
         td_error = self.v_target - self.value
 
         with tf.variable_scope('critic_loss'):
@@ -121,7 +121,7 @@ class Agent:
             log_prob = tf.reduce_sum(
                 tf.log(action_prob) * tf.one_hot(self.actions, Config.data.action_num, dtype=tf.float32), axis=1,
                 keep_dims=True)
-            exp_v = log_prob * td_error
+            exp_v = log_prob * tf.stop_gradient(td_error)
             entropy = -tf.reduce_sum(action_prob * tf.log(action_prob + 1e-5),
                                      axis=1, keep_dims=True)
             self.actor_loss = tf.reduce_mean(-(Config.train.dis_entropy_beta * entropy + exp_v))
@@ -175,7 +175,6 @@ class Agent:
         observation = self.env.reset()
         ep_reward = 0
         while True:
-            # self.env.render()
             action = self.choose_action(observation)
             next_observation, reward, done, info = self.env.step(action)
             ep_reward += reward
@@ -194,8 +193,6 @@ class Agent:
                 observation = self.env.reset()
                 ep_reward = 0
                 while True:
-                    # if self.mode == 'worker0':
-                    #     self.env.render()
                     action = self.choose_action(observation)
                     next_observation, reward, done, info = self.env.step(action)
                     total_step += 1
@@ -224,14 +221,15 @@ class Agent:
                         self.sess.run(self.pull_op)
 
                     if done:
-                        # if Config.train.global_ep == 0:
-                        #     Config.train.global_running_r = ep_reward
-                        # else:
-                        #     Config.train.global_running_r = 0.9 * Config.train.global_running_r + 0.1 * ep_reward
-                        # Config.train.global_ep += 1
-                        # print(self.mode, '  global_ep:', Config.train.global_ep,
-                        #       '    global_running_r:',
-                        #       round(Config.train.global_running_r, 2))
+                        if Config.train.global_ep == 0:
+                            Config.train.global_running_r = ep_reward
+                        else:
+                            Config.train.global_running_r = 0.9 * Config.train.global_running_r + 0.1 * ep_reward
+                        Config.train.global_ep += 1
+                        if Config.train.global_ep % 100 == 0:
+                            print(self.mode, '  global_ep:', Config.train.global_ep,
+                                  '    global_running_r:',
+                                  round(Config.train.global_running_r, 2))
                         break
                     else:
                         observation = next_observation
