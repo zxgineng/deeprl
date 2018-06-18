@@ -1,0 +1,26 @@
+data:
+  base_path: 'data/'
+  save_state_file: 'state.pkl'
+  env_name: 'Pendulum-v0'
+#  env_name: 'CartPole-v0'
+
+train:
+  batch_size: 32
+  reward_decay: 0.99
+
+  actor_loss_method: 'clip_surr'
+  actor_update_steps: 10
+  kl_lam: 0.5
+  kl_lam_alpha: 2.0
+  surr_clip_epsilon: 0.2
+  kl_target: 0.01
+  kl_target_beta: 1.5
+
+  update_n_iter: 10
+
+  actor_lr: 0.0001
+  critic_lr: 0.0002
+
+  save_checkpoints_steps: 10000
+  model_dir: 'logs/dppo'
+  max_steps: 100000
