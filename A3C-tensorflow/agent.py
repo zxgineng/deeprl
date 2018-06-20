@@ -76,16 +76,17 @@ class Agent:
                     tf.nn.softmax(logits, name='action_prob')
                 else:
                     _, mu, sigma = Graph().build(self.states)
-                    mu, sigma = Config.data.action_bound * mu, sigma
                     normal_dist = tf.distributions.Normal(mu, sigma)
-                    tf.clip_by_value(tf.squeeze(normal_dist.sample(1), axis=[0, 1]), -Config.data.action_bound,
-                                     Config.data.action_bound, 'continuous_action')
+                    tf.squeeze(normal_dist.sample(1), axis=[0, 1],name='continuous_action')
 
                 self.actor_params = tf.trainable_variables('chief/actor')
                 self.critic_params = tf.trainable_variables('chief/critic')
 
-                self.actor_optimizer = tf.train.RMSPropOptimizer(Config.train.actor_learning_rate, decay=0.99)
-                self.critic_optimizer = tf.train.RMSPropOptimizer(Config.train.critic_learning_rate, decay=0.99)
+                global_step = tf.train.get_global_step()
+                actor_lr = Config.train.actor_lr * (1.0 - global_step/Config.train.max_steps)
+                critic_lr = Config.train.critic_lr * (1.0 - global_step / Config.train.max_steps)
+                self.actor_optimizer = tf.train.RMSPropOptimizer(actor_lr, decay=0.99)
+                self.critic_optimizer = tf.train.RMSPropOptimizer(critic_lr, decay=0.99)
 
         else:
             with tf.variable_scope(self.mode):
@@ -102,11 +103,8 @@ class Agent:
                     self._build_discrete_loss(action_prob)
                 else:
                     self.value, mu, sigma = Graph().build(self.states)
-                    mu, sigma = Config.data.action_bound * mu, sigma
-
                     normal_dist = tf.distributions.Normal(mu, sigma)
-                    tf.clip_by_value(tf.squeeze(normal_dist.sample(1), axis=[0, 1]), -Config.data.action_bound,
-                                     Config.data.action_bound, 'continuous_action')
+                    tf.squeeze(normal_dist.sample(1), axis=[0, 1],name='continuous_action')
                     self._build_continuous_loss(normal_dist)
 
                 self._build_update_op()
@@ -124,18 +122,18 @@ class Agent:
             exp_v = log_prob * tf.stop_gradient(td_error)
             entropy = -tf.reduce_sum(action_prob * tf.log(action_prob + 1e-5),
                                      axis=1, keep_dims=True)
-            self.actor_loss = tf.reduce_mean(-(Config.train.dis_entropy_beta * entropy + exp_v))
+            self.actor_loss = tf.reduce_mean(-(Config.train.entropy_beta * entropy + exp_v))
 
     def _build_continuous_loss(self, normal_dist):
         td_error = self.v_target - self.value
-
-        with tf.variable_scope('critic_loss'):
+        with tf.name_scope('critic_loss'):
             self.critic_loss = tf.reduce_mean(tf.square(td_error))
-        with tf.variable_scope('actor_loss'):
+        with tf.name_scope('actor_loss'):
             log_prob = normal_dist.log_prob(self.actions)
-            entropy = normal_dist.entropy()
             exp_v = log_prob * tf.stop_gradient(td_error)
-            self.actor_loss = tf.reduce_mean(-(Config.train.con_entropy_beta * entropy + exp_v))
+            entropy = normal_dist.entropy()
+            exp_v = Config.train.entropy_beta * entropy + exp_v
+            self.actor_loss = tf.reduce_mean(-exp_v)
 
     def _build_update_op(self):
         actor_params = tf.trainable_variables(self.mode + '/actor')
@@ -147,20 +145,23 @@ class Agent:
             actor_grads = tf.gradients(self.actor_loss, actor_params)
             critic_grads = tf.gradients(self.critic_loss, critic_params)
 
-        with tf.variable_scope('sync'):
-            with tf.variable_scope('pull'):
-                pull_actor_params = [tf.assign(worker_param, chief_param) for worker_param, chief_param in
-                                     zip(actor_params, self.chief.actor_params)]
-                pull_critic_params = [tf.assign(worker_param, chief_param) for worker_param, chief_param in
-                                      zip(critic_params, self.chief.critic_params)]
-                self.pull_op = tf.group(pull_actor_params + pull_critic_params)
+        with tf.name_scope('sync'):
+            with tf.name_scope('pull'):
+                self.pull_a_params_op = [actor_param.assign(chief_param) for actor_param, chief_param in
+                                         zip(actor_params, self.chief.actor_params)]
+                self.pull_c_params_op = [critic_param.assign(chief_param) for critic_param, chief_param in
+                                         zip(critic_params, self.chief.critic_params)]
 
-            with tf.variable_scope('push'):
-                push_actor_params = self.chief.actor_optimizer.apply_gradients(
-                    zip(actor_grads, self.chief.actor_params))
-                push_critic_params = self.chief.critic_optimizer.apply_gradients(
+            with tf.name_scope('push'):
+                self.update_a_op = self.chief.actor_optimizer.apply_gradients(zip(actor_grads, self.chief.actor_params))
+                self.update_c_op = self.chief.critic_optimizer.apply_gradients(
                     zip(critic_grads, self.chief.critic_params))
-                self.push_op = tf.group([push_actor_params, push_critic_params])
+
+    def update_chief(self, feed_dict):
+        self.sess.run([self.update_a_op, self.update_c_op, self.mode + '/global_step_add:0'], feed_dict)
+
+    def pull_chief(self):
+        self.sess.run([self.pull_a_params_op + self.pull_c_params_op])
 
     def choose_action(self, observation):
         if Config.data.action_type == 'discrete':
@@ -183,11 +184,11 @@ class Agent:
             else:
                 observation = next_observation
 
+
     def learn(self):
-        assert 'worker' in self.mode
         total_step = 0
-        self.sess.run(self.pull_op)
-        buffer_states, buffer_actions, buffer_rewards = [], [], []
+        buffer_s, buffer_a, buffer_r = [], [], []
+        self.pull_chief()
         try:
             while not self.coord.should_stop():
                 observation = self.env.reset()
@@ -197,41 +198,45 @@ class Agent:
                     next_observation, reward, done, info = self.env.step(action)
                     total_step += 1
                     ep_reward += reward
-                    buffer_states.append(observation)
-                    buffer_actions.append(action)
-                    buffer_rewards.append(reward)
+                    buffer_s.append(observation)
+                    buffer_a.append(action)
+                    buffer_r.append(reward)
 
-                    if total_step % Config.train.update_n_iter == 0 or done:
-
+                    if total_step % 10 == 0 or done:
                         if done:
                             next_value = 0
                         else:
                             next_value = self.sess.run(self.value, {self.states: [next_observation]})[0, 0]
                         buffer_v_target = []
-
-                        for reward in buffer_rewards[::-1]:
+                        for reward in buffer_r[::-1]:
                             next_value = reward + Config.train.reward_decay * next_value
                             buffer_v_target.append([next_value])
+
                         buffer_v_target.reverse()
 
-                        self.sess.run([self.push_op, self.mode + '/global_step_add:0'],
-                                      {self.states: buffer_states, self.actions: buffer_actions,
-                                       self.v_target: buffer_v_target})
-                        buffer_states, buffer_actions, buffer_rewards = [], [], []
-                        self.sess.run(self.pull_op)
+                        feed_dict = {
+                            self.states: buffer_s,
+                            self.actions: buffer_a,
+                            self.v_target: buffer_v_target,
+                        }
+                        self.update_chief(feed_dict)
+                        buffer_s, buffer_a, buffer_r = [], [], []
+                        self.pull_chief()
 
                     if done:
                         if Config.train.global_ep == 0:
                             Config.train.global_running_r = ep_reward
                         else:
                             Config.train.global_running_r = 0.9 * Config.train.global_running_r + 0.1 * ep_reward
-                        Config.train.global_ep += 1
                         if Config.train.global_ep % 100 == 0:
-                            print(self.mode, '  global_ep:', Config.train.global_ep,
-                                  '    global_running_r:',
-                                  round(Config.train.global_running_r, 2))
+                            print(
+                                self.mode,
+                                "Ep:", Config.train.global_ep,
+                                "| Ep_r: %i" % Config.train.global_running_r,
+                            )
+                        Config.train.global_ep += 1
                         break
                     else:
                         observation = next_observation
         except Exception as e:
-            pass
+            print(e.args)

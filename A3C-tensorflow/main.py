@@ -17,8 +17,7 @@ def run(mode, run_config, params):
 
     if mode == 'train':
         def input():
-            inputs = tf.placeholder(tf.float32,
-                                    [None, Config.data.state_dim], 'states')
+            inputs = tf.placeholder(tf.float32)
 
             return inputs, None
 

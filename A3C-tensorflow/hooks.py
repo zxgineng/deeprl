@@ -11,8 +11,6 @@ class TrainingHook(tf.train.SessionRunHook):
         self.workers = workers
         self.chief = chief
         self.ep_reward_queue = deque([], 100)
-        # self.eval_count = 0
-        # self.ave_ep_reward_saver = []
         self.start = False
         self.last_step = 0
 
@@ -23,15 +21,11 @@ class TrainingHook(tf.train.SessionRunHook):
         training_state = load_training_state()
         if training_state:
             self.ep_reward_queue = training_state['reward_queue']
-            # self.eval_count = training_state['eval_count']
-            # self.ave_ep_reward_saver = training_state['ave_ep_reward_saver']
             self.last_step = training_state['last_step']
             print('training state loaded.')
 
     def _save_training_state(self):
-        save_training_state(reward_queue=self.ep_reward_queue,
-                            # eval_count=self.eval_count, ave_ep_reward_saver=self.ave_ep_reward_saver,
-                            last_step = self.last_step)
+        save_training_state(reward_queue=self.ep_reward_queue,last_step = self.last_step)
         print('training state saved.')
 
     def after_create_session(self, session, coord):
@@ -50,12 +44,9 @@ class TrainingHook(tf.train.SessionRunHook):
             self.start = True
 
         ep_reward = self.chief.eval()
-        # self.eval_count += 1
         self.ep_reward_queue.append(ep_reward)
         ave_ep_reward = round(sum(self.ep_reward_queue) / len(self.ep_reward_queue), 2)
-        # if self.eval_count % 100 == 0:
-        #     print('episode:',self.eval_count,'  ave ep reward:', ave_ep_reward)
-        #     self.ave_ep_reward_saver.append((Config.train.global_ep, ave_ep_reward))
+        # ave_ep_reward = 1
 
         return tf.train.SessionRunArgs('global_step:0',
                                        feed_dict={'ave_ep_reward:0': ave_ep_reward})
