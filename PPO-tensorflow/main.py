@@ -6,30 +6,23 @@ from agent import Agent
 from utils import Config
 
 
-def run(mode, run_config, params):
+def run(mode, run_config):
     env = gym.make(Config.data.env_name).unwrapped
     agent = Agent(env)
     estimator = tf.estimator.Estimator(
         model_fn=agent.model_fn,
         model_dir=Config.train.model_dir,
-        params=params,
         config=run_config)
 
-    def input():
-        inputs = tf.placeholder(tf.float32,
-                                [None, Config.data.state_dim], 'states')
-        return inputs, None
-
     if mode == 'train':
-        estimator.train(input_fn=input, max_steps=Config.train.max_steps)
+        estimator.train(input_fn=lambda: (None, None), max_steps=Config.train.max_steps)
+    else:
+        estimator.evaluate(input_fn=lambda: (None, None))
     env.close()
 
 
 def main(mode):
-    params = tf.contrib.training.HParams(**Config.train.to_dict())
-
-    config = tf.ConfigProto()
-    config.gpu_options.allow_growth = True
+    config = tf.ConfigProto(device_count={'GPU': 0})
 
     run_config = tf.estimator.RunConfig(
         model_dir=Config.train.model_dir,
@@ -37,14 +30,14 @@ def main(mode):
         save_checkpoints_steps=Config.train.save_checkpoints_steps,
         log_step_count_steps=None)
 
-    run(mode, run_config, params)
+    run(mode, run_config)
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument('--mode', type=str, default='train', choices=['train'],
+    parser.add_argument('--mode', type=str, default='train', choices=['train','eval'],
                         help='Mode (train)')
-    parser.add_argument('--config', type=str, default='config/ddpg.yml', help='config file name')
+    parser.add_argument('--config', type=str, default='config/ppo.yml', help='config file name')
 
     args = parser.parse_args()
 
