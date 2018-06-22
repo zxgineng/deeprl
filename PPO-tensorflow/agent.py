@@ -15,13 +15,8 @@ class Agent:
 
     def _config_initialize(self):
         """initialize env config"""
-        if 'n' not in vars(self.env.action_space):
-            Config.data.action_dim = self.env.action_space.shape[0]
-            Config.data.action_bound = self.env.action_space.high
-            Config.data.action_type = 'continuous'
-        else:
-            Config.data.action_num = self.env.action_space.n
-            Config.data.action_type = 'discrete'
+        Config.data.action_dim = self.env.action_space.shape[0]
+        Config.data.action_bound = self.env.action_space.high
         Config.data.state_dim = self.env.observation_space.shape[0]
 
         self.scaler = Scaler(Config.data.state_dim)
@@ -59,33 +54,35 @@ class Agent:
             self.run_episode()
 
     def choose_action(self, observation):
-        if Config.data.action_type == 'discrete':
-            pass
-            # TODO 离散
-        else:
-            feed_dict = {self.actor.states: [observation]}
-            action = self.sess.run(self.actor.sample, feed_dict)
-
+        feed_dict = {self.actor.states: [observation]}
+        action = self.sess.run(self.actor.sample, feed_dict)
         return action
 
     def eval(self, animate=False):
         observation = self.env.reset()
         ep_reward = 0
-        while True:
+        count = 0
+        done = False
+        while not done:
             if animate:
                 self.env.render()
             action = self.choose_action(self.scaler.normalize(observation))
             next_observation, reward, done, info = self.env.step(action)
             ep_reward += reward
-            if done:
-                return ep_reward
-            else:
-                observation = next_observation
+            observation = next_observation
+
+            if Config.train.get('max_episode_steps', None):
+                count += 1
+                if count == Config.train.max_episode_steps:
+                    break
+
+        return ep_reward
 
     def run_episode(self, animate=False):
         observation = self.env.reset()
         states, actions, rewards, unscaled_states = [], [], [], []
         done = False
+        count = 0
 
         while not done:
             if animate:
@@ -98,9 +95,28 @@ class Agent:
             next_observation, reward, done, info = self.env.step(action)
             rewards.append(reward)
             observation = next_observation
+
+            if Config.train.get('max_episode_steps', None):
+                count += 1
+                if count == Config.train.max_episode_steps:
+                    break
+
         self.scaler.update(np.array(unscaled_states))
 
-        return states, actions, rewards
+        return states, actions, rewards, next_observation, done
+
+    def cal_target_v(self, done, next_observation, rewards):
+        if done:
+            next_value = 0
+        else:
+            next_value = \
+            self.sess.run(self.critic.value, {self.critic.states: [self.scaler.normalize(next_observation)]})[0, 0]
+        target_v = []
+        for reward in rewards[::-1]:
+            next_value = reward + Config.train.reward_decay * next_value
+            target_v.append([next_value])
+        target_v.reverse()
+        return target_v
 
     def update_actor(self, states, actions, target_v):
         feed_dict = {self.critic.states: states, self.actor.states: states}
@@ -129,4 +145,3 @@ class Agent:
         feed_dict = {self.critic.states: states, self.critic.target_v: target_v}
         for e in range(Config.train.critic_train_episode):
             self.sess.run(self.critic.train_op, feed_dict)
-

@@ -31,13 +31,8 @@ class TrainingHook(tf.train.SessionRunHook):
         self._load_training_state()
 
     def before_run(self, run_context):
-        states, actions, rewards = self.agent.run_episode()
-        next_value = 0
-        target_v = []
-        for reward in rewards[::-1]:
-            next_value = reward + Config.train.reward_decay * next_value
-            target_v.append([next_value])
-        target_v.reverse()
+        states, actions, rewards,next_observation,done = self.agent.run_episode()
+        target_v = self.agent.cal_target_v(done, next_observation, rewards)
         self.agent.update_actor(states, actions, target_v)
         self.agent.update_critic(states, target_v)
 
