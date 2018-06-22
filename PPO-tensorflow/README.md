@@ -78,6 +78,11 @@ Evaluate
 python main.py --mode eval
 ```
 
+## Tensorboard
+Average reward of 100 episode
+
+![images](images/ave-ep-reward.png)
+
 
 ## Example
 Teach the object to run with two legs
