@@ -14,7 +14,8 @@ class ExperienceReplay:
         sample = random.sample(self.memory, batch_size)
         return sample
 
-    def get_length(self):
+    @property
+    def length(self):
         return len(self.memory)
 
     def load_memory(self, memory):

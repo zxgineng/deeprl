@@ -1,18 +1,15 @@
 import tensorflow as tf
 import os
+from collections import deque
 
-from utils import Config,save_training_state,load_training_state
+from utils import Config, save_training_state, load_training_state
 
 
-class TrainHook(tf.train.SessionRunHook):
-
+class TrainingHook(tf.train.SessionRunHook):
     def __init__(self, agent):
-        self.env = agent.env
         self.agent = agent
-
-        self.episode = 0
-        self.done = True
-        self._build_replace_target_op()
+        self.ep_reward_queue = deque([], 100)
+        self.last_step = 0
 
         if not os.path.exists(Config.data.base_path):
             os.makedirs(Config.data.base_path)
@@ -20,64 +17,48 @@ class TrainHook(tf.train.SessionRunHook):
     def _load_training_state(self):
         training_state = load_training_state()
         if training_state:
-            self.agent.replay_memory.load_memory(training_state['memory'])
-            self.episode = training_state['episode']
-            print('episode: ', self.episode, '    training state loaded.')
+            self.agent.replay_memory.load_memory(training_state['replay_memory'])
+            self.last_step = training_state['last_step']
+            Config.train.epsilon = training_state['epsilon']
+            print('training state loaded.')
 
     def _save_training_state(self):
-        save_training_state(memory=self.agent.replay_memory.get_memory(), episode=self.episode)
-        print('episode: ', self.episode, '    training state saved.')
-
-    def _build_replace_target_op(self):
-        train_params = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, 'eval_net')
-        target_params = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, 'target_net')
-        self.replace_target_op = [tf.assign(target_param, train_param) for train_param, target_param in
-                                  zip(train_params, target_params)]
+        save_training_state(epsilon=Config.train.epsilon,replay_memory=self.agent.replay_memory.get_memory(), last_step=self.last_step)
+        print('training state saved.')
 
     def after_create_session(self, session, coord):
         self.agent.sess = session
-        self.epsilon = Config.train.initial_epsilon
+        self.agent.replace_target_params()
+        Config.train.epsilon = Config.train.initial_epsilon
         self._load_training_state()
 
     def before_run(self, run_context):
+        ep_reward = self.agent.run_episode()
+        self.ep_reward_queue.append(ep_reward)
+        ave_ep_reward = sum(self.ep_reward_queue) / len(self.ep_reward_queue)
 
-        while True:
-            if self.done:
-                self.observation = self.env.reset()
-                self.ep_reward = 0
-
-            self.env.render()
-
-            action = self.agent.choose_action(self.observation, self.epsilon)
-
-            next_observation, reward, self.done, info = self.env.step(action)
-
-            reward = abs(next_observation[0] - (-0.5))
-
-            self.agent.store_transition(self.observation, action, reward, next_observation, self.done)
-
-            self.ep_reward += reward
-
-            self.observation = next_observation
-
-            if self.done:
-                self.episode += 1
-                print('episode: ', self.episode, '  ep_reward: ', round(self.ep_reward, 2))
-
-            if self.agent.replay_memory.get_length() >= Config.train.observe_n_iter:
-                return self.agent.learn()
-            else:
-                continue
+        return tf.train.SessionRunArgs('global_step:0', feed_dict={'ave_ep_reward:0': ave_ep_reward})
 
     def after_run(self, run_context, run_values):
-
         global_step = run_values.results
-        if global_step % Config.train.replace_target_n_iter == 0:
-            run_context.session.run(self.replace_target_op)
-            print('target params replaced.')
-
-        if global_step ==1 or global_step % Config.train.save_checkpoints_steps == 0:
+        # synchronized with checkpoints
+        if global_step - self.last_step >= Config.train.save_checkpoints_steps:
+            self.last_step = global_step
             self._save_training_state()
 
     def end(self, session):
         self._save_training_state()
+
+
+class EvalHook(tf.train.SessionRunHook):
+    def __init__(self, agent):
+        self.agent = agent
+
+    def after_create_session(self, session, coord):
+        self.agent.sess = session
+        Config.train.epsilon = 0.1
+
+    def before_run(self, run_context):
+        ep_reward = self.agent.eval(True)
+        print('ep_reward:',ep_reward)
+
