@@ -26,7 +26,7 @@ class ConfigMeta(type):
         def parse_description_then_remove(self, path):
             self.description = {}
             config = ""
-            with open(path, 'r',encoding='utf8') as infile:
+            with open(path, 'r', encoding='utf8') as infile:
                 for line in infile.readlines():
                     config += line
             return config
@@ -53,7 +53,8 @@ class ConfigMeta(type):
             if self.config is None:
                 raise FileNotFoundError("No such files start filename")
             else:
-                return f"Read config file name: {self.read_fname}\n" + json.dumps(self.config,ensure_ascii=False,indent=4)
+                return f"Read config file name: {self.read_fname}\n" + json.dumps(self.config, ensure_ascii=False,
+                                                                                  indent=4)
 
         def _set_config(self):
             if self.config is None:
@@ -103,13 +104,33 @@ class SubConfig:
     def __repr__(self):
         return json.dumps(self.__dict__["__dict__"], indent=4)
 
-def save_training_state(**kwargs):
-    file = os.path.join(Config.data.base_path, Config.data.save_state_file)
-    with open(file, 'wb') as f:
-        pickle.dump(kwargs,f)
 
-def load_training_state():
-    file = os.path.join(Config.data.base_path, Config.data.save_state_file)
-    with open(file, 'rb') as f:
-        training_state = pickle.load(f)
-    return training_state
+def save_training_state(**kwargs):
+    if 'file' in kwargs:
+        file = kwargs['file']
+    else:
+        file = os.path.join(Config.data.base_path, Config.data.save_state_file)
+    try:
+        with open(file, 'wb') as f:
+            pickle.dump(kwargs, f)
+    except Exception as e:
+        print(e.args)
+        print('save state failed.')
+
+
+def load_training_state(**kwargs):
+    if 'file' in kwargs:
+        file = kwargs['file']
+    else:
+        file = os.path.join(Config.data.base_path, Config.data.save_state_file)
+    if os.path.isfile(file):
+        try:
+            with open(file, 'rb') as f:
+                training_state = pickle.load(f)
+            return training_state
+        except Exception as e:
+            print(e.args)
+            print('load state failed.')
+    else:
+        return None
+

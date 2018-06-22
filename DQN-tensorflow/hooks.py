@@ -10,6 +10,7 @@ class TrainingHook(tf.train.SessionRunHook):
         self.agent = agent
         self.ep_reward_queue = deque([], 100)
         self.last_step = 0
+        self.first_save = True
 
         if not os.path.exists(Config.data.base_path):
             os.makedirs(Config.data.base_path)
@@ -42,7 +43,8 @@ class TrainingHook(tf.train.SessionRunHook):
     def after_run(self, run_context, run_values):
         global_step = run_values.results
         # synchronized with checkpoints
-        if global_step - self.last_step >= Config.train.save_checkpoints_steps:
+        if self.first_save or (global_step - self.last_step >= Config.train.save_checkpoints_steps):
+            self.first_save = False
             self.last_step = global_step
             self._save_training_state()
 

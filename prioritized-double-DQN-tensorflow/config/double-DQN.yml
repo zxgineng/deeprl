@@ -1,20 +1,21 @@
 data:
   base_path: 'data/'
   save_state_file: 'state.pkl'
-  num_action: 11
-  state_dim: 3
+  env_name: 'MountainCar-v0'
 
 train:
   batch_size: 32
 
-  initial_epsilon: 0.1
+  initial_epsilon: 1.0
+  epsilon_decrement: 0.0002
+  final_epsilon: 0.1
 
   reward_decay: 0.9
   observe_n_iter: 1500
   memory_size: 3000
-  replace_target_n_iter: 200
+  replace_target_n_iter: 300
 
-  learning_rate: 0.005
-  save_checkpoints_steps: 5000
+  learning_rate: 0.001
+  save_checkpoints_steps: 10000
   model_dir: 'logs/double-DQN'
-  max_steps: 20000
+  max_steps: 70000
