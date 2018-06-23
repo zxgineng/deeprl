@@ -1,5 +1,6 @@
 import tensorflow as tf
 from tensorflow.contrib import slim
+import numpy as np
 
 from utils import Config
 
@@ -15,10 +16,14 @@ class Model:
     def _build_graph(self):
         with tf.variable_scope('network'):
             self.states = tf.placeholder(tf.float32, [None, Config.data.state_dim], 'states')
-            value = slim.fully_connected(self.states, 20)
+            net = slim.fully_connected(self.states, Config.data.state_dim * 10)
+
+            value = slim.fully_connected(net, int(np.sqrt(Config.data.state_dim * Config.data.action_num)) * 10)
             value = slim.fully_connected(value, 1, activation_fn=None)
-            advantage = slim.fully_connected(self.states, 20)
+
+            advantage = slim.fully_connected(net, int(np.sqrt(Config.data.state_dim * Config.data.action_num)) * 10)
             advantage = slim.fully_connected(advantage, Config.data.action_num, activation_fn=None)
+
             self.q_value = value + (advantage - tf.reduce_mean(advantage, -1, True))
 
     def _build_loss(self):

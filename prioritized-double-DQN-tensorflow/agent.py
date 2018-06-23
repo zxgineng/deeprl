@@ -38,7 +38,7 @@ class Agent:
 
         if self.mode == tf.estimator.ModeKeys.TRAIN:
             self._build_update_op()
-            ave_ep_reward = tf.placeholder(tf.float32, None)
+            ave_ep_reward = tf.placeholder(tf.float32, None,name='ave_ep_reward')
             tf.summary.scalar('ave_ep_reward', ave_ep_reward)
             self.loss = ave_ep_reward
             self.train_op = tf.no_op()

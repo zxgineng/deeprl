@@ -23,7 +23,6 @@ def run(mode, run_config):
 
 def main(mode):
     config = tf.ConfigProto(device_count={'GPU': 0})
-    config.gpu_options.allow_growth = True
 
     run_config = tf.estimator.RunConfig(
         model_dir=Config.train.model_dir,

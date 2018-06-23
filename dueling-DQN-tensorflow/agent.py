@@ -4,7 +4,7 @@ import tensorflow as tf
 from hooks import TrainingHook, EvalHook
 from model import Model
 from replay_memory import PriorizedExperienceReplay
-from utils import Config, Scaler
+from utils import Config
 
 
 class Agent:
@@ -18,7 +18,6 @@ class Agent:
         """initialize env config"""
         Config.data.action_num = self.env.action_space.n
         Config.data.state_dim = self.env.observation_space.shape[0]
-        self.scaler = Scaler(Config.data.state_dim)
 
     def model_fn(self, mode, features, labels, params):
         self.mode = mode
@@ -39,7 +38,7 @@ class Agent:
 
         if self.mode == tf.estimator.ModeKeys.TRAIN:
             self._build_update_op()
-            ave_ep_reward = tf.placeholder(tf.float32, None)
+            ave_ep_reward = tf.placeholder(tf.float32, None,name='ave_ep_reward')
             tf.summary.scalar('ave_ep_reward', ave_ep_reward)
             self.loss = ave_ep_reward
             self.train_op = tf.no_op()
@@ -55,24 +54,6 @@ class Agent:
         tf.assign_add(global_step, 1, name='global_step_add')
         self.replace_target_op = tf.group([tf.assign(target_param, train_param) for train_param, target_param in
                                            zip(self.eval_net.params, self.target_net.params)])
-
-    def init_scaler(self, init_episode=5):
-        for e in range(init_episode):
-            observation = self.env.reset()
-            states = []
-            count = 0
-            done = False
-            while not done:
-                states.append(observation)
-                action = self.choose_action(observation)
-                next_observation, reward, done, info = self.env.step(action)
-                observation = next_observation
-
-                if Config.train.get('max_episode_steps', None):
-                    count += 1
-                    if count == Config.train.max_episode_steps:
-                        break
-            self.scaler.update(np.array(states))
 
     def eval(self, animate=False):
         observation = self.env.reset()
@@ -93,10 +74,8 @@ class Agent:
                     break
         return ep_reward
 
-    def run_episode(self,animate=False):
+    def run_episode(self, animate=False):
         observation = self.env.reset()
-        unscaled = [observation]
-        observation = self.scaler.normalize(observation)
         count = 0
         ep_reward = 0
         done = False
@@ -105,16 +84,6 @@ class Agent:
                 self.env.render()
             action = self.choose_action(observation)
             next_observation, reward, done, info = self.env.step(action)
-            unscaled.append(next_observation)
-            next_observation = self.scaler.normalize(next_observation)
-
-            # customize reward
-            # the smaller theta and closer to center the better
-            x, x_dot, theta, theta_dot = next_observation
-            r1 = (self.env.x_threshold - abs(x)) / self.env.x_threshold - 0.8
-            r2 = (self.env.theta_threshold_radians - abs(theta)) / self.env.theta_threshold_radians - 0.5
-            reward = r1 + r2
-
 
             ep_reward += reward
             self.store_transition(observation, action, reward, next_observation, done)
@@ -133,7 +102,6 @@ class Agent:
                 count += 1
                 if count == Config.train.max_episode_steps:
                     break
-        self.scaler.update(np.array(unscaled))
         return ep_reward
 
     def choose_action(self, observation):
