@@ -1,25 +1,33 @@
 data:
   base_path: 'data/'
   save_state_file: 'state.pkl'
-  env_name: 'Hopper-v2'
-
+#  env_name: 'Hopper-v2'
+  env_name: 'Pendulum-v0'
 train:
-  batch_size: 64
+#  batch_size: 64
+  batch_size: 32
+
+  max_episode_steps: 200
 
   noise_theta: 0.15
   noise_sigma: 0.2
   noise_mu: 0
 
-  reward_decay: 0.99
-  observe_n_iter: 100000
-  memory_size: 1000000
+  reward_decay: 0.9
+#  observe_n_iter: 100000
+#  memory_size: 1000000
+  observe_n_iter: 10000
+  memory_size: 10000
 
-  TAU: 0.001
+  TAU: 0.01
 
-  critic_l2_loss_weight: 0.02
+#  critic_l2_loss_weight: 0.02
+  critic_l2_loss_weight: 0.0
 
-  actor_learning_rate: 0.0001
-  critic_learning_rate: 0.001
+#  actor_lr: 0.0001
+#  critic_lr: 0.001
+  actor_lr: 0.001
+  critic_lr: 0.002
 
   save_checkpoints_steps: 500000
   model_dir: 'logs/ddpg'

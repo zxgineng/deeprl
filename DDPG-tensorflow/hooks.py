@@ -1,20 +1,17 @@
 import tensorflow as tf
+import os
 from collections import deque
 
-from utils import *
+from utils import Config, save_training_state, load_training_state
 
 
-class TrainHook(tf.train.SessionRunHook):
+class TrainingHook(tf.train.SessionRunHook):
     def __init__(self, agent):
-        self.env = agent.env
         self.agent = agent
-
-        self.done = True
-        self.episode = 0
         self.ep_reward_queue = deque([], 100)
-        self.ave_reward_list = []
-
-        self._build_replace_target_op()
+        self.last_step = 0
+        self.first_save = True
+        self.ep = 0
 
         if not os.path.exists(Config.data.base_path):
             os.makedirs(Config.data.base_path)
@@ -22,84 +19,33 @@ class TrainHook(tf.train.SessionRunHook):
     def _load_training_state(self):
         training_state = load_training_state()
         if training_state:
-            self.agent.replay_memory.load_memory(training_state['memory'])
-            self.episode = training_state['episode']
-            self.ep_reward_queue = training_state['reward_queue']
-            self.ave_reward_list = training_state['ave_reward_list']
-            print('episode: ', self.episode, '    training state loaded.')
+            self.agent.replay_memory.load_memory(training_state['replay_memory'])
+            self.last_step = training_state['last_step']
+            print('training state loaded.')
 
     def _save_training_state(self):
-        save_training_state(memory=self.agent.replay_memory.get_memory(), episode=self.episode,
-                            reward_queue=self.ep_reward_queue, ave_reward_list=self.ave_reward_list)
-        print('episode: ', self.episode, '    training state saved.')
-
-    def _build_replace_target_op(self):
-        a_params = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='actor/eval')
-        c_params = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='critic/eval')
-        at_params = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='actor/target')
-        ct_params = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='critic/target')
-
-        actor_replace_op = [tf.assign(target_param, target_param * (
-                1 - Config.train.TAU) + train_param * Config.train.TAU) for
-                            train_param, target_param in
-                            zip(a_params, at_params)]
-        critic_replace_op = [tf.assign(target_param, target_param * (
-                1 - Config.train.TAU) + train_param * Config.train.TAU) for
-                             train_param, target_param in
-                             zip(c_params, ct_params)]
-
-        actor_initial_op = [tf.assign(target_param, train_param) for
-                            train_param, target_param in
-                            zip(a_params, at_params)]
-        critic_initial_op = [tf.assign(target_param, train_param) for
-                             train_param, target_param in
-                             zip(c_params, ct_params)]
-
-        self.initial_replace_op = actor_initial_op + critic_initial_op
-        self.replace_target_op = actor_replace_op + critic_replace_op
+        save_training_state(replay_memory=self.agent.replay_memory.get_memory(), last_step=self.last_step)
+        print('training state saved.')
 
     def after_create_session(self, session, coord):
         self.agent.sess = session
-        session.run(self.initial_replace_op)
+        self.agent.init_target_params()
         self._load_training_state()
 
     def before_run(self, run_context):
+        ep_reward = self.agent.run_episode()
+        self.ep_reward_queue.append(ep_reward)
+        ave_ep_reward = sum(self.ep_reward_queue) / len(self.ep_reward_queue)
+        print(round(ave_ep_reward, 2))
 
-        while True:
-            if self.done:
-                self.observation = self.env.reset()
-                self.ep_reward = 0
-
-            # self.env.render()
-            action = self.agent.choose_action(self.observation)
-
-            next_observation, reward, self.done, info = self.env.step(action)
-
-            self.agent.store_transition(self.observation, action, reward, next_observation, self.done)
-
-            self.ep_reward += reward
-
-            if self.done:
-                self.episode += 1
-                self.ep_reward_queue.append(self.ep_reward)
-                if self.episode % 100 == 0:
-                    ave_ep_reward = round(sum(self.ep_reward_queue) / len(self.ep_reward_queue),2)
-                    self.ave_reward_list.append(ave_ep_reward)
-                    print('*' * 40)
-                    print('episode:', self.episode, ' ave_ep_reward:', ave_ep_reward)
-                    print('*' * 40)
-            else:
-                self.observation = next_observation
-
-            if self.agent.replay_memory.length >= Config.train.observe_n_iter:
-                return self.agent.learn()
+        return tf.train.SessionRunArgs('global_step:0', feed_dict={'ave_ep_reward:0': ave_ep_reward})
 
     def after_run(self, run_context, run_values):
-
         global_step = run_values.results
-        run_context.session.run(self.replace_target_op)
-
-        if global_step == 1 or global_step % Config.train.save_checkpoints_steps == 0:
+        # synchronized with checkpoints
+        if self.first_save or (global_step - self.last_step >= Config.train.save_checkpoints_steps):
+            self.first_save = False
+            self.last_step = global_step
             self._save_training_state()
 
     def end(self, session):
@@ -107,31 +53,12 @@ class TrainHook(tf.train.SessionRunHook):
 
 
 class EvalHook(tf.train.SessionRunHook):
-    def __init__(self, env, agent):
-        self.env = env
+    def __init__(self, agent):
         self.agent = agent
-
-        self.done = True
-        self.episode = 0
 
     def after_create_session(self, session, coord):
         self.agent.sess = session
 
     def before_run(self, run_context):
-        while True:
-            if self.done:
-                self.observation = self.env.reset()
-                self.ep_reward = 0
-
-            self.env.render()
-            action = self.agent.choose_action(self.observation,noise=False)
-            next_observation, reward, self.done, info = self.env.step(action)
-            self.ep_reward += reward
-
-            if self.done:
-                self.episode += 1
-                print('episode:', self.episode, ' ep_reward:', self.ep_reward)
-
-            else:
-                self.observation = next_observation
-
+        ep_reward = self.agent.eval(True)
+        print('ep_reward:', ep_reward)
