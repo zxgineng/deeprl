@@ -135,8 +135,8 @@ def load_training_state(**kwargs):
     else:
         return None
 
-class Scaler:
 
+class Scaler:
     def __init__(self, obs_dim):
         self.vars = np.zeros(obs_dim)
         self.means = np.zeros(obs_dim)
@@ -166,4 +166,8 @@ class Scaler:
 
     def get(self):
         """ returns 2-tuple: (stdd, means) """
-        return np.sqrt(self.vars)+ 1e-6,self.means
+        return np.sqrt(self.vars) + 1e-6, self.means
+
+    def normalize(self, x):
+        stdd = np.sqrt(self.vars) + 1e-6
+        return (x - self.means) / stdd

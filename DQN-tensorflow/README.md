@@ -74,6 +74,6 @@ Average reward of 100 episode
 ![images](images/ave-ep-reward.png)
 
 ## Example
-
+Balance a pole on a cart
 
 ![images](images/cartpole.gif)

@@ -74,6 +74,6 @@ Average reward of 100 episode
 
 
 ## Example
-
+Teach the car to drive up a big hill
 
 ![images](images/example.gif)

@@ -1,4 +1,4 @@
-# Proximal Policy Optimization
+# PPO
 
 TensorFlow implementation of [Proximal Policy Optimization Algorithms](https://arxiv.org/pdf/1707.06347.pdf). (2017. 7),  
 and [Emergence of Locomotion Behaviours in Rich Environments](https://arxiv.org/pdf/1707.02286.pdf). (2017. 7)

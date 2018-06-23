@@ -9,10 +9,10 @@ class Actor:
     def __init__(self):
         with tf.variable_scope('actor') as sc:
             self._build_graph()
-            self._build_loss()
-            # self._build_train_op()
-            self._build_grads()
             self.params = tf.trainable_variables(sc.name)
+            self._build_loss()
+            self._build_optimizer()
+            self._build_grads()
 
     def _build_graph(self):
         self.states = tf.placeholder(tf.float32, [None, Config.data.state_dim], 'states')
@@ -23,7 +23,7 @@ class Actor:
             hidden2 = int(np.sqrt(Config.data.state_dim * Config.data.action_num) * 10)
             hidden3 = Config.data.action_num * 10
             net = slim.fully_connected(net, hidden2)
-            net = slim.fully_connected(net, hidden3,)
+            net = slim.fully_connected(net, hidden3)
             logits = slim.fully_connected(net, Config.data.action_num, activation_fn=None)
             self.policy = tf.nn.softmax(logits)
         else:
@@ -43,7 +43,7 @@ class Actor:
         with tf.variable_scope('loss'):
             self.td_error = tf.placeholder(tf.float32, [None, 1], 'td_error')
             if Config.data.action_type == 'discrete':
-                self.actions = tf.placeholder(tf.float32, [None],name='actions')
+                self.actions = tf.placeholder(tf.int32, [None], name='actions')
 
                 log_prob = tf.reduce_sum(
                     tf.log(self.policy) * tf.one_hot(self.actions, Config.data.action_num, dtype=tf.float32), axis=1,
@@ -54,7 +54,6 @@ class Actor:
                 exp_v = Config.train.entropy_beta * entropy + exp_v
                 self.loss = tf.reduce_mean(-exp_v)
             else:
-
                 self.actions = tf.placeholder(tf.float32, [None, Config.data.action_dim], name='actions')
 
                 log_prob = self.policy.log_prob(self.actions)
@@ -63,8 +62,8 @@ class Actor:
                 exp_v = Config.train.entropy_beta * entropy + exp_v
                 self.loss = tf.reduce_mean(-exp_v)
 
-    def _build_train_op(self):
-        self.train_op = tf.train.AdamOptimizer(Config.train.actor_lr).minimize(self.loss,var_list=self.params)
+    def _build_optimizer(self):
+        self.optimizer = tf.train.RMSPropOptimizer(Config.train.actor_lr, decay=0.99)
 
     def _build_grads(self):
         self.grads = tf.gradients(self.loss, self.params)
