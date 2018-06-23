@@ -33,9 +33,6 @@ class Actor:
             net = slim.fully_connected(net, hidden3)
             self.mean = slim.fully_connected(net, Config.data.action_dim, None)
             self.stdd = slim.fully_connected(net, Config.data.action_dim, tf.nn.softplus)
-            # log_stdd = tf.get_variable('log_stdd', [1, Config.data.action_dim], tf.float32,
-            #                            tf.constant_initializer(0.0))
-            # self.stdd = tf.exp(log_stdd)
             self.policy = tf.distributions.Normal(loc=self.mean, scale=self.stdd)
             self.sample = tf.squeeze(self.policy.sample(1), axis=[0, 1])
 

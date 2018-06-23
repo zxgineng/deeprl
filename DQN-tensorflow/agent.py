@@ -16,7 +16,7 @@ class Agent:
 
     def _config_initialize(self):
         """initialize env config"""
-        Config.data.action_num = self.env.action_space.n
+        Config.data.action_num = 11
         Config.data.state_dim = self.env.observation_space.shape[0]
 
     def model_fn(self, mode, features, labels, params):
@@ -64,11 +64,15 @@ class Agent:
             if animate:
                 self.env.render()
             action = self.choose_action(observation)
-            next_observation, reward, done, info = self.env.step(action)
+
+            f_action = (action - (Config.data.action_num - 1) / 2) / (
+                    (Config.data.action_num - 1) / 4)  # convert to [-2 ~ 2] float actions
+
+            next_observation, reward, done, info = self.env.step([f_action])
             ep_reward += reward
             observation = next_observation
 
-            if Config.train.get('max_episode_steps',None):
+            if Config.train.get('max_episode_steps', None):
                 count += 1
                 if count == Config.train.max_episode_steps:
                     break
@@ -83,14 +87,11 @@ class Agent:
             if animate:
                 self.env.render()
             action = self.choose_action(observation)
-            next_observation, reward, done, info = self.env.step(action)
 
-            # customize reward
-            # the smaller theta and closer to center the better
-            x, x_dot, theta, theta_dot = next_observation
-            r1 = (self.env.x_threshold - abs(x)) / self.env.x_threshold - 0.8
-            r2 = (self.env.theta_threshold_radians - abs(theta)) / self.env.theta_threshold_radians - 0.5
-            reward = r1 + r2
+            f_action = (action - (Config.data.action_num - 1) / 2) / (
+                    (Config.data.action_num - 1) / 4)  # convert to [-2 ~ 2] float actions
+
+            next_observation, reward, done, info = self.env.step([f_action])
 
             ep_reward += reward
             self.store_transition(observation, action, reward, next_observation, done)
@@ -98,13 +99,13 @@ class Agent:
 
             if self.replay_memory.length >= Config.train.observe_n_iter:
                 global_step = self.update_params()
-                Config.train.epsilon = max(Config.train.get('final_epsilon',0.0),
+                Config.train.epsilon = max(Config.train.get('final_epsilon', 0.0),
                                            Config.train.epsilon - Config.train.epsilon_decrement)
 
                 if global_step % Config.train.replace_target_n_iter == 0:
                     self.replace_target_params()
 
-            if Config.train.get('max_episode_steps',None):
+            if Config.train.get('max_episode_steps', None):
                 count += 1
                 if count == Config.train.max_episode_steps:
                     break

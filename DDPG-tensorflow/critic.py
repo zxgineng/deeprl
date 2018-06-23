@@ -24,12 +24,12 @@ class Critic:
         with slim.arg_scope([slim.fully_connected],
                             weights_regularizer=slim.l2_regularizer(Config.train.critic_l2_loss_weight)):
             self.states = tf.placeholder(tf.float32, [None, Config.data.state_dim], 'states')
-            net = slim.fully_connected(self.states, 40, weights_initializer=_random_uniform_initializer(self.states),
+            net = slim.fully_connected(self.states, 400, weights_initializer=_random_uniform_initializer(self.states),
                                        biases_initializer=_random_uniform_initializer(self.states))
-            net1 = slim.fully_connected(net, 30, activation_fn=None,
+            net1 = slim.fully_connected(net, 300, activation_fn=None,
                                         weights_initializer=_random_uniform_initializer(net),
                                         biases_initializer=_random_uniform_initializer(net))
-            net2 = slim.fully_connected(self.actions, 30, activation_fn=None,
+            net2 = slim.fully_connected(self.actions, 300, activation_fn=None,
                                         weights_initializer=_random_uniform_initializer(self.actions),
                                         biases_initializer=None)
             net = tf.nn.relu(net1 + net2)

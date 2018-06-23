@@ -147,7 +147,7 @@ class Agent:
             policy = self.sess.run(self.actor.policy, {self.actor.states: [observation]})[0]
             action = np.random.choice(range(Config.data.action_num), p=policy)
         else:
-            action = self.sess.run(self.actor.sample, {self.actor.states: [observation]})  # [action_num]
+            action = self.sess.run(self.actor.sample, {self.actor.states: [observation]})
         return action
 
     def eval(self, animate=False):

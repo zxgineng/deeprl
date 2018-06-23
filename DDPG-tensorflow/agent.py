@@ -5,7 +5,7 @@ from hooks import TrainingHook, EvalHook
 from actor import Actor
 from critic import Critic
 from replay_memory import ExperienceReplay
-from utils import Config,Scaler
+from utils import Config
 
 
 class Agent:
@@ -20,7 +20,6 @@ class Agent:
         Config.data.action_dim = self.env.action_space.shape[0]
         Config.data.action_bound = self.env.action_space.high[0]
         Config.data.state_dim = self.env.observation_space.shape[0]
-
 
     def model_fn(self, mode, features, labels, params):
         self.mode = mode
@@ -82,26 +81,6 @@ class Agent:
         self.update_target_op = tf.group(actor_update_op + critic_update_op)
         self.init_target_op = tf.group(actor_init_op + critic_init_op)
 
-    # def init_scaler(self, init_episode=5):
-    #     for e in range(init_episode):
-    #         observation = self.env.reset()
-    #         states = []
-    #         count = 0
-    #         done = False
-    #         while not done:
-    #             states.append(observation)
-    #             action = self.choose_action(observation)
-    #             f_action = (action - (Config.data.action_num - 1) / 2) / (
-    #                     (Config.data.action_num - 1) / 4)  # convert to [-2 ~ 2] float actions
-    #             next_observation, reward, done, info = self.env.step([f_action])
-    #             observation = next_observation
-    #
-    #             if Config.train.get('max_episode_steps', None):
-    #                 count += 1
-    #                 if count == Config.train.max_episode_steps:
-    #                     break
-    #         self.scaler.update(np.array(states))
-
     def update_params(self):
         batch = self.replay_memory.get_batch(Config.train.batch_size)
         states, actions, rewards, next_states = [], [], [], []
@@ -159,7 +138,6 @@ class Agent:
 
     def run_episode(self, animate=False):
         observation = self.env.reset()
-        # unscaled = [observation]
         count = 0
         ep_reward = 0
         done = False

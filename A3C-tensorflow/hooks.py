@@ -23,10 +23,11 @@ class TrainingHook(tf.train.SessionRunHook):
         if training_state:
             self.chief.scaler = training_state['scaler']
             self.last_step = training_state['last_step']
+            self.ep_reward_queue = training_state['ep_reward_queue']
             print('training state loaded.')
 
     def _save_training_state(self):
-        save_training_state(scaler=self.chief.scaler, last_step=self.last_step)
+        save_training_state(scaler=self.chief.scaler, last_step=self.last_step, ep_reward_queue=self.ep_reward_queue)
         print('training state saved.')
 
     def after_create_session(self, session, coord):

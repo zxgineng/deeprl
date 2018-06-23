@@ -11,7 +11,6 @@ class TrainingHook(tf.train.SessionRunHook):
         self.ep_reward_queue = deque([], 100)
         self.last_step = 0
         self.first_save = True
-        self.ep = 0
 
         if not os.path.exists(Config.data.base_path):
             os.makedirs(Config.data.base_path)
@@ -21,10 +20,12 @@ class TrainingHook(tf.train.SessionRunHook):
         if training_state:
             self.agent.replay_memory.load_memory(training_state['replay_memory'])
             self.last_step = training_state['last_step']
+            self.ep_reward_queue = training_state['ep_reward_queue']
             print('training state loaded.')
 
     def _save_training_state(self):
-        save_training_state(replay_memory=self.agent.replay_memory.get_memory(), last_step=self.last_step)
+        save_training_state(replay_memory=self.agent.replay_memory.get_memory(), last_step=self.last_step,
+                            ep_reward_queue=self.ep_reward_queue)
         print('training state saved.')
 
     def after_create_session(self, session, coord):
@@ -36,7 +37,6 @@ class TrainingHook(tf.train.SessionRunHook):
         ep_reward = self.agent.run_episode()
         self.ep_reward_queue.append(ep_reward)
         ave_ep_reward = sum(self.ep_reward_queue) / len(self.ep_reward_queue)
-        print(round(ave_ep_reward, 2))
 
         return tf.train.SessionRunArgs('global_step:0', feed_dict={'ave_ep_reward:0': ave_ep_reward})
 

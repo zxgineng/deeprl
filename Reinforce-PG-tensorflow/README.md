@@ -13,12 +13,11 @@ TensorFlow implementation of Reinforce Policy Gradient
 
 
     ├── config                  # Config files (.yml)
-    ├── architecture            # architecture graphs
-        ├── __init__.py             # network
-    ├── agent.py                # define agent, model, loss
+    ├── model                   # network, loss
+    ├── agent.py                # agent
     ├── main.py                 # train and evaluate
-    ├── utils.py                # config tools 
-    └── hooks.py                # define hooks
+    ├── utils.py                # config, save tools 
+    └── hooks.py                # train, eval hooks
     
 
 ## Config
@@ -29,16 +28,15 @@ reinforce.yml
 data:
   base_path: 'data/'
   save_state_file: 'state.pkl'
-  env_name: 'MountainCar-v0'
+  env_name: 'CartPole-v1'
 
 train:
-  reward_decay: 0.995
+  reward_decay: 0.99
 
-  learning_rate: 0.01
+  learning_rate: 0.001
   save_checkpoints_steps: 100
   model_dir: 'logs/reinforce'
   max_steps: 1000
-
 ```
 
 
@@ -48,6 +46,21 @@ train:
 Train
 
 ```
-python main.py
+python main.py --mode train
 ```
 
+Evaluate
+
+```
+python main.py --mode eval
+```
+
+## Tensorboard
+Average reward of 100 episode
+
+![images](images/reward.png)
+
+## Example
+Balance a pole on a cart
+
+![images](images/example.gif)

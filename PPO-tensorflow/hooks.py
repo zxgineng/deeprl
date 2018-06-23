@@ -22,10 +22,11 @@ class TrainingHook(tf.train.SessionRunHook):
         if training_state:
             self.agent.scaler = training_state['scaler']
             self.last_step = training_state['last_step']
+            self.ep_reward_queue = training_state['ep_reward_queue']
             print('training state loaded.')
 
     def _save_training_state(self):
-        save_training_state(scaler=self.agent.scaler,last_step=self.last_step)
+        save_training_state(scaler=self.agent.scaler, last_step=self.last_step, ep_reward_queue=self.ep_reward_queue)
         print('training state saved.')
 
     def after_create_session(self, session, coord):
@@ -34,7 +35,7 @@ class TrainingHook(tf.train.SessionRunHook):
         self._load_training_state()
 
     def before_run(self, run_context):
-        states, actions, rewards,next_observation,done = self.agent.run_episode()
+        states, actions, rewards, next_observation, done = self.agent.run_episode()
         target_v = self.agent.cal_target_v(done, next_observation, rewards)
         self.agent.update_actor(states, actions, target_v)
         self.agent.update_critic(states, target_v)

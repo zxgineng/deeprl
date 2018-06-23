@@ -32,10 +32,11 @@ DQN.yml
 data:
   base_path: 'data/'
   save_state_file: 'state.pkl'
-  env_name: 'CartPole-v1'
+  env_name: 'Pendulum-v0'
 
 train:
   batch_size: 32
+  max_episode_steps: 200
 
   initial_epsilon: 1.0
   epsilon_decrement: 0.001
@@ -49,7 +50,7 @@ train:
   learning_rate: 0.01
   save_checkpoints_steps: 10000
   model_dir: 'logs/DQN'
-  max_steps: 150000
+  max_steps: 30000
 ```
 
 
@@ -71,9 +72,9 @@ python main.py --mode eval
 ## Tensorboard
 Average reward of 100 episode
 
-![images](images/ave-ep-reward.png)
+![images](images/reward.png)
 
 ## Example
-Balance a pole on a cart
+Swing up and balance a pendulum
 
-![images](images/cartpole.gif)
+![images](images/example.gif)

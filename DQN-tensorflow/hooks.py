@@ -21,10 +21,12 @@ class TrainingHook(tf.train.SessionRunHook):
             self.agent.replay_memory.load_memory(training_state['replay_memory'])
             self.last_step = training_state['last_step']
             Config.train.epsilon = training_state['epsilon']
+            self.ep_reward_queue = training_state['ep_reward_queue']
             print('training state loaded.')
 
     def _save_training_state(self):
-        save_training_state(epsilon=Config.train.epsilon,replay_memory=self.agent.replay_memory.get_memory(), last_step=self.last_step)
+        save_training_state(epsilon=Config.train.epsilon, replay_memory=self.agent.replay_memory.get_memory(),
+                            last_step=self.last_step, ep_reward_queue=self.ep_reward_queue)
         print('training state saved.')
 
     def after_create_session(self, session, coord):
@@ -37,7 +39,7 @@ class TrainingHook(tf.train.SessionRunHook):
         ep_reward = self.agent.run_episode()
         self.ep_reward_queue.append(ep_reward)
         ave_ep_reward = sum(self.ep_reward_queue) / len(self.ep_reward_queue)
-
+        print(ave_ep_reward)
         return tf.train.SessionRunArgs('global_step:0', feed_dict={'ave_ep_reward:0': ave_ep_reward})
 
     def after_run(self, run_context, run_values):
@@ -62,5 +64,4 @@ class EvalHook(tf.train.SessionRunHook):
 
     def before_run(self, run_context):
         ep_reward = self.agent.eval(True)
-        print('ep_reward:',ep_reward)
-
+        print('ep_reward:', ep_reward)

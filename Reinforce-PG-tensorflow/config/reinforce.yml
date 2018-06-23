@@ -1,12 +1,12 @@
 data:
   base_path: 'data/'
   save_state_file: 'state.pkl'
-  env_name: 'MountainCar-v0'
+  env_name: 'CartPole-v1'
 
 train:
-  reward_decay: 0.995
+  reward_decay: 0.99
 
-  learning_rate: 0.01
+  learning_rate: 0.001
   save_checkpoints_steps: 100
   model_dir: 'logs/reinforce'
   max_steps: 1000

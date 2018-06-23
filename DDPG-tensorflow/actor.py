@@ -19,10 +19,10 @@ class Actor:
 
     def _build_graph(self):
         self.states = tf.placeholder(tf.float32, [None, Config.data.state_dim], 'states')
-        net = slim.fully_connected(self.states, 40,
+        net = slim.fully_connected(self.states, 400,
                                    weights_initializer=_random_uniform_initializer(self.states),
                                    biases_initializer=_random_uniform_initializer(self.states))
-        net = slim.fully_connected(net, 30,
+        net = slim.fully_connected(net, 300,
                                    weights_initializer=_random_uniform_initializer(net),
                                    biases_initializer=_random_uniform_initializer(net))
         net = slim.fully_connected(net, Config.data.action_dim, activation_fn=tf.nn.tanh,
