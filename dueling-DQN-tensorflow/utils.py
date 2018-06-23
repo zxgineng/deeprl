@@ -2,6 +2,7 @@ import yaml
 import json
 import os
 import pickle
+import numpy as np
 
 
 class ConfigMeta(type):
@@ -26,7 +27,7 @@ class ConfigMeta(type):
         def parse_description_then_remove(self, path):
             self.description = {}
             config = ""
-            with open(path, 'r',encoding='utf8') as infile:
+            with open(path, 'r', encoding='utf8') as infile:
                 for line in infile.readlines():
                     config += line
             return config
@@ -53,7 +54,8 @@ class ConfigMeta(type):
             if self.config is None:
                 raise FileNotFoundError("No such files start filename")
             else:
-                return f"Read config file name: {self.read_fname}\n" + json.dumps(self.config,ensure_ascii=False,indent=4)
+                return f"Read config file name: {self.read_fname}\n" + json.dumps(self.config, ensure_ascii=False,
+                                                                                  indent=4)
 
         def _set_config(self):
             if self.config is None:
@@ -103,13 +105,69 @@ class SubConfig:
     def __repr__(self):
         return json.dumps(self.__dict__["__dict__"], indent=4)
 
-def save_training_state(**kwargs):
-    file = os.path.join(Config.data.base_path, Config.data.save_state_file)
-    with open(file, 'wb') as f:
-        pickle.dump(kwargs,f)
 
-def load_training_state():
-    file = os.path.join(Config.data.base_path, Config.data.save_state_file)
-    with open(file, 'rb') as f:
-        training_state = pickle.load(f)
-    return training_state
+def save_training_state(**kwargs):
+    if 'file' in kwargs:
+        file = kwargs['file']
+    else:
+        file = os.path.join(Config.data.base_path, Config.data.save_state_file)
+    try:
+        with open(file, 'wb') as f:
+            pickle.dump(kwargs, f)
+    except Exception as e:
+        print(e.args)
+        print('save state failed.')
+
+
+def load_training_state(**kwargs):
+    if 'file' in kwargs:
+        file = kwargs['file']
+    else:
+        file = os.path.join(Config.data.base_path, Config.data.save_state_file)
+    if os.path.isfile(file):
+        try:
+            with open(file, 'rb') as f:
+                training_state = pickle.load(f)
+            return training_state
+        except Exception as e:
+            print(e.args)
+            print('load state failed.')
+    else:
+        return None
+
+
+class Scaler:
+    def __init__(self, obs_dim):
+        self.vars = np.zeros(obs_dim)
+        self.means = np.zeros(obs_dim)
+        self.m = 0
+        self.n = 0
+        self.first_pass = True
+
+    def update(self, x):
+
+        if self.first_pass:
+            self.means = np.mean(x, axis=0)
+            self.vars = np.var(x, axis=0)
+            self.m = x.shape[0]
+            self.first_pass = False
+        else:
+            n = x.shape[0]
+            new_data_var = np.var(x, axis=0)
+            new_data_mean = np.mean(x, axis=0)
+            new_data_mean_sq = np.square(new_data_mean)
+            new_means = ((self.means * self.m) + (new_data_mean * n)) / (self.m + n)
+            self.vars = (((self.m * (self.vars + np.square(self.means))) +
+                          (n * (new_data_var + new_data_mean_sq))) / (self.m + n) -
+                         np.square(new_means))
+            self.vars = np.maximum(0.0, self.vars)  # occasionally goes negative, clip
+            self.means = new_means
+            self.m += n
+
+    def get(self):
+        """ returns 2-tuple: (stdd, means) """
+        return np.sqrt(self.vars) + 1e-6, self.means
+
+    def normalize(self, x):
+        stdd = np.sqrt(self.vars) + 1e-6
+        return (x - self.means) / stdd

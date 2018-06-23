@@ -1,32 +1,28 @@
 import argparse
 import tensorflow as tf
 
-from model import Model
+import gym
+from agent import Agent
 from utils import Config
 
 
-def run(mode, run_config, params):
-    model = Model()
+def run(mode, run_config):
+    env = gym.make(Config.data.env_name).unwrapped
+    agent = Agent(env)
     estimator = tf.estimator.Estimator(
-        model_fn=model.model_fn,
+        model_fn=agent.model_fn,
         model_dir=Config.train.model_dir,
-        params=params,
         config=run_config)
 
     if mode == 'train':
-        def input():
-            inputs = tf.placeholder(tf.float32,
-                                    [None, Config.data.state_dim],'current_state')
+        estimator.train(input_fn=lambda: (None, None), max_steps=Config.train.max_steps)
+    else:
+        estimator.evaluate(input_fn=lambda: (None, None))
+    env.close()
 
-            return (inputs, None)
-
-        estimator.train(input_fn=input,max_steps=Config.train.max_steps)
-    exit()
 
 def main(mode):
-    params = tf.contrib.training.HParams(**Config.train.to_dict())
-
-    config = tf.ConfigProto()
+    config = tf.ConfigProto(device_count={'GPU': 0})
     config.gpu_options.allow_growth = True
 
     run_config = tf.estimator.RunConfig(
@@ -35,18 +31,18 @@ def main(mode):
         save_checkpoints_steps=Config.train.save_checkpoints_steps,
         log_step_count_steps=None)
 
-    run(mode, run_config, params)
+    run(mode, run_config)
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument('--mode', type=str, default='train', choices=['train'],
+    parser.add_argument('--mode', type=str, default='train', choices=['train','eval'],
                         help='Mode (train)')
     parser.add_argument('--config', type=str, default='config/dueling-DQN.yml', help='config file name')
 
     args = parser.parse_args()
 
-    # tf.logging.set_verbosity(tf.logging.INFO)
+    tf.logging.set_verbosity(tf.logging.INFO)
 
     Config(args.config)
     print(Config)

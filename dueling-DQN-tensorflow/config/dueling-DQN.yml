@@ -1,13 +1,14 @@
 data:
   base_path: 'data/'
   save_state_file: 'state.pkl'
-  num_action: 11
-  state_dim: 3
+  env_name: 'CartPole-v1'
 
 train:
   batch_size: 32
 
-  initial_epsilon: 0.1
+  initial_epsilon: 1.0
+  epsilon_decrement: 0.001
+  final_epsilon: 0.1
 
   reward_decay: 0.9
   observe_n_iter: 1500
@@ -16,5 +17,5 @@ train:
 
   learning_rate: 0.005
   save_checkpoints_steps: 5000
-  model_dir: 'logs/double-DQN'
-  max_steps: 20000
+  model_dir: 'logs/dueling-DQN'
+  max_steps: 100000
