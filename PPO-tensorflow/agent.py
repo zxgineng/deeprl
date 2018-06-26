@@ -21,16 +21,15 @@ class Agent:
 
         self.scaler = Scaler(Config.data.state_dim)
 
-    def model_fn(self, mode, features, labels, params):
+    def model_fn(self, mode, features, labels):
         self.mode = mode
-        self.loss, self.train_op, self.predictions, self.training_hooks, self.evaluation_hooks = None, None, None, None, None
+        self.loss, self.train_op, self.training_hooks, self.evaluation_hooks = None, None, None, None
         self._build_graph()
 
         return tf.estimator.EstimatorSpec(
             mode=mode,
             loss=self.loss,
             train_op=self.train_op,
-            predictions=self.predictions,
             training_hooks=self.training_hooks,
             evaluation_hooks=self.evaluation_hooks)
 

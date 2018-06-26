@@ -6,13 +6,11 @@ data:
 train:
   batch_size: 64
 
-  max_episode_steps: 1000
-
   noise_theta: 0.15
   noise_sigma: 0.2
-  noise_mu: 0
+  noise_mu: 0.0
 
-  reward_decay: 0.9
+  reward_decay: 0.99
   observe_n_iter: 100000
   memory_size: 1000000
 

@@ -9,6 +9,8 @@ class Model:
         with tf.variable_scope('model') as sc:
             self._build_graph()
             self.params = tf.trainable_variables(sc.name)
+            self._build_loss()
+            self._build_train_op()
 
     def _build_graph(self):
         with tf.variable_scope('network'):
@@ -16,9 +18,6 @@ class Model:
             net = slim.fully_connected(self.states, Config.data.state_dim * 10)
             self.logits = slim.fully_connected(net, Config.data.action_num, None)
             self.prob = tf.nn.softmax(self.logits)
-
-        self._build_loss()
-        self._build_train_op()
 
     def _build_loss(self):
         with tf.variable_scope('loss'):
@@ -29,4 +28,4 @@ class Model:
 
     def _build_train_op(self):
         with tf.variable_scope('optimizer'):
-            self.train_op = tf.train.AdamOptimizer(Config.train.learning_rate).minimize(self.loss)
+            self.train_op = tf.train.AdamOptimizer(Config.train.learning_rate).minimize(self.loss,var_list=self.params)

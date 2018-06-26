@@ -21,16 +21,15 @@ class Agent:
         Config.data.action_bound = self.env.action_space.high[0]
         Config.data.state_dim = self.env.observation_space.shape[0]
 
-    def model_fn(self, mode, features, labels, params):
+    def model_fn(self, mode, features, labels):
         self.mode = mode
-        self.loss, self.train_op, self.predictions, self.training_hooks, self.evaluation_hooks = None, None, None, None, None
+        self.loss, self.train_op, self.training_hooks, self.evaluation_hooks = None, None, None, None
         self._build_graph()
 
         return tf.estimator.EstimatorSpec(
             mode=mode,
             loss=self.loss,
             train_op=self.train_op,
-            predictions=self.predictions,
             training_hooks=self.training_hooks,
             evaluation_hooks=self.evaluation_hooks)
 
@@ -39,6 +38,9 @@ class Agent:
                                 Config.train.noise_mu)
         with tf.variable_scope('eval_net'):
             self.eval_actor = Actor()
+            self.eval_critic = Critic(self.eval_actor.actions)
+
+            self.eval_actor.build_train_op(self.eval_critic.qa_value)
 
         if self.mode == tf.estimator.ModeKeys.TRAIN:
             self._build_update_op()
@@ -55,10 +57,10 @@ class Agent:
         global_step = tf.train.get_global_step()
         tf.assign_add(global_step, 1, name='global_step_add')
 
-        with tf.variable_scope('eval_net'):
-            self.eval_critic = Critic(self.eval_actor.actions)
-
-        self.eval_actor.build_train_op(self.eval_critic.qa_value)
+        # with tf.variable_scope('eval_net'):
+        #     self.eval_critic = Critic(self.eval_actor.actions)
+        #
+        #     self.eval_actor.build_train_op(self.eval_critic.qa_value)
 
         with tf.variable_scope('target_net'):
             self.target_actor = Actor()

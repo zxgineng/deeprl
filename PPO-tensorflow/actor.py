@@ -16,7 +16,7 @@ class Actor:
 
     def _build_graph(self):
         self.states = tf.placeholder(tf.float32, [None, Config.data.state_dim], 'states')
-
+        # all layers use tanh in paper
         hidden1 = Config.data.state_dim * 10
         net = slim.fully_connected(self.states, hidden1)
         hidden2 = int(np.sqrt(Config.data.state_dim * Config.data.action_dim) * 10)

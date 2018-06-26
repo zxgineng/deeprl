@@ -18,7 +18,7 @@ class Critic:
         hidden1 = Config.data.state_dim * 10
         hidden3 = 5
         hidden2 = int(np.sqrt(hidden1 * hidden3))
-
+        # all layers use tanh in paper
         net = slim.fully_connected(self.states, hidden1)
         net = slim.fully_connected(net, hidden2)
         net = slim.fully_connected(net, hidden3)

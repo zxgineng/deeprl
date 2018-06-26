@@ -16,13 +16,12 @@ TensorFlow implementation of [Continuous control with deep reinforcement learnin
 
 
     ├── config                  # Config files (.yml)
-    ├── architecture            # architecture graphs
-        ├── __init__.py             # network
-    ├── agent.py                # define agent, model, loss
-    ├── main.py                 # train and evaluate
-    ├── utils.py                # config tools 
-    ├── replay_memory.py        # restore and sample 
-    └── hooks.py                # define hooks
+    ├── actor.py                # actor network, loss
+    ├── critic.py               # critic network, loss
+    ├── agent.py                # agent 
+    ├── main.py                 # train and eval
+    ├── utils.py                # config, save tools  
+    └── hooks.py                # train and eval hooks
     
 
 ## Config
@@ -40,7 +39,7 @@ train:
 
   noise_theta: 0.15
   noise_sigma: 0.2
-  noise_mu: 0
+  noise_mu: 0.0
 
   reward_decay: 0.99
   observe_n_iter: 100000
@@ -50,10 +49,10 @@ train:
 
   critic_l2_loss_weight: 0.02
 
-  actor_learning_rate: 0.0001
-  critic_learning_rate: 0.001
+  actor_lr: 0.0001
+  critic_lr: 0.001
 
-  save_checkpoints_steps: 500000
+  save_checkpoints_steps: 200000
   model_dir: 'logs/ddpg'
   max_steps: 2500000
 ```
@@ -74,10 +73,14 @@ Evaluate
 python main.py --mode eval
 ```
 
-## Example
-teach the object to jump
-  
-![images](images/reward.jpg)
+## Tensorboard
+Average reward of 100 episode
 
+![images](images/reward.png)
+
+
+## Example
+Teach the object to jump
+  
 
 ![images](images/example.gif)

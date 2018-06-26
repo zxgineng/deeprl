@@ -41,9 +41,9 @@ class Critic:
 
     def _build_loss(self):
         self.target_qa = tf.placeholder(tf.float32, [Config.train.batch_size, 1], 'target_qa')
-        sc = tf.get_variable_scope()
-        self.loss = tf.reduce_mean(tf.square(self.target_qa - self.qa_value)) + tf.losses.get_regularization_loss(
-            sc.name)
+        sc = tf.get_default_graph().get_name_scope()
+        self.loss = tf.reduce_mean(tf.square(self.target_qa - self.qa_value)) + tf.losses.get_regularization_loss(sc)
+
 
     def _build_train_op(self):
         self.train_op = tf.train.AdamOptimizer(Config.train.critic_lr).minimize(self.loss, var_list=self.params)
