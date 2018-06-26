@@ -26,16 +26,15 @@ class Model:
             Config.data.action_type = 'discrete'
         Config.data.state_dim = self.env.observation_space.shape[0]
 
-    def model_fn(self, mode, features, labels, params):
+    def model_fn(self, mode, features, labels):
         self.mode = mode
-        self.loss, self.train_op, self.predictions, self.training_hooks, self.evaluation_hooks = None, None, None, None, None
+        self.loss, self.train_op, self.training_hooks, self.evaluation_hooks = None, None, None, None
         self.build_graph()
 
         return tf.estimator.EstimatorSpec(
             mode=mode,
             loss=self.loss,
             train_op=self.train_op,
-            predictions=self.predictions,
             training_hooks=self.training_hooks,
             evaluation_hooks=self.evaluation_hooks)
 
