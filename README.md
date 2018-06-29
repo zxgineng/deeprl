@@ -8,11 +8,11 @@ TensorFlow implementation of deep reinforcement learning algorithm
 
 **Prioritized-DDQN**  
 
-![images](prioritized-double-DQN-tensorflow/images/example.gif)
+![images](Prioritized-Double-DQN-tensorflow/images/example.gif)
 
 **Dueling-DQN**  
 
-![images](dueling-DQN-tensorflow/images/example.gif)
+![images](Dueling-DQN-tensorflow/images/example.gif)
 
 **Reinforce-Policy-Gradient**  
 
